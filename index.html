@@ -43,14 +43,12 @@ body {
   color: var(--fg);
   font-family: Arial, sans-serif;
   min-height: 100vh;
-  /* prevent iOS bounce scroll */
   overscroll-behavior: none;
 }
 #header {
   background: var(--card);
   border-bottom: 1px solid var(--border);
   padding: 0.7em 1em;
-  /* account for notch/status bar on phones */
   padding-top: max(0.7em, env(safe-area-inset-top));
   display: flex;
   align-items: center;
@@ -110,7 +108,6 @@ input[type=text], select {
   text-transform: none;
   letter-spacing: normal;
   opacity: 1;
-  /* larger touch targets on mobile */
   min-height: 44px;
 }
 input[type=text]:focus, select:focus {
@@ -288,13 +285,12 @@ canvas {
 }
 .icon-btn:hover { border-color: var(--accent); }
 hr { border: none; border-top: 1px solid var(--border); margin: 0.7em 0; }
-
-/* install banner */
 #install-bar {
   display: none;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   padding: 0.6em 1em;
+  padding-top: max(0.6em, env(safe-area-inset-top));
   align-items: center;
   justify-content: space-between;
   gap: 0.75em;
@@ -322,11 +318,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.7em 0; }
 </head>
 <body>
 
-<!-- Install prompt banner -->
 <div id="install-bar">
-  <span>📲 Add DCI Calc to your home screen for offline use</span>
+  <span id="install-msg"></span>
   <div style="display:flex;gap:0.5em;flex-shrink:0;">
-    <button id="install-btn">Install</button>
+    <button id="install-btn" style="display:none;">Install</button>
     <button id="install-bar-dismiss">✕</button>
   </div>
 </div>
@@ -346,8 +341,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 0.7em 0; }
     <div class="ctrl-grid">
       <label class="ctrl-label">Aspect Ratio
         <input type="text" id="ratio" placeholder="e.g. 2.39 or 16:9"
-               autocomplete="off" spellcheck="false"
-               inputmode="decimal">
+               autocomplete="off" spellcheck="false" inputmode="decimal">
       </label>
       <label class="ctrl-label">Container
         <select id="container">
@@ -447,10 +441,10 @@ var RATIO_EPS = 0.005;
    STATE
 ════════════════════════════════════ */
 var state = {
-  results:      [],
-  resizeRaf:    null,
-  toastTimer:   null,
-  deferredPWA:  null,   /* holds the beforeinstallprompt event */
+  results:     [],
+  resizeRaf:   null,
+  toastTimer:  null,
+  deferredPWA: null,
 };
 
 /* ════════════════════════════════════
@@ -471,20 +465,16 @@ function parseRatio(raw) {
 
 function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
 
-function getContainer(fmt, resKey) {
-  return CONTAINERS[fmt][resKey];
-}
+function getContainer(fmt, resKey) { return CONTAINERS[fmt][resKey]; }
 
 function getFit(cw, ch, ratio) {
   var cr = cw / ch;
   var w, h, barType, barPx;
   if (cr > ratio + RATIO_EPS) {
-    h = ch;
-    w = Math.min(Math.ceil(h * ratio / 2) * 2, cw);
+    h = ch; w = Math.min(Math.ceil(h * ratio / 2) * 2, cw);
     barType = 'pillarbox'; barPx = Math.round((cw - w) / 2);
   } else if (cr < ratio - RATIO_EPS) {
-    w = cw;
-    h = Math.min(Math.ceil(w / ratio / 2) * 2, ch);
+    w = cw; h = Math.min(Math.ceil(w / ratio / 2) * 2, ch);
     barType = 'letterbox'; barPx = Math.round((ch - h) / 2);
   } else {
     w = cw; h = ch; barType = 'letterbox'; barPx = 0;
@@ -573,16 +563,10 @@ function drawCanvas(canvas, baseW, baseH, contW, contH,
 
   if (barType === 'letterbox') {
     var bh = Math.round((contH - fh) / 2) * sc;
-    if (bh > 0) {
-      ctx.fillRect(csx, csy,    contW*sc, bh);
-      ctx.fillRect(csx, ay+ahs, contW*sc, bh);
-    }
+    if (bh > 0) { ctx.fillRect(csx, csy, contW*sc, bh); ctx.fillRect(csx, ay+ahs, contW*sc, bh); }
   } else {
     var bw = Math.round((contW - fw) / 2) * sc;
-    if (bw > 0) {
-      ctx.fillRect(csx,    csy, bw, contH*sc);
-      ctx.fillRect(ax+aws, csy, bw, contH*sc);
-    }
+    if (bw > 0) { ctx.fillRect(csx, csy, bw, contH*sc); ctx.fillRect(ax+aws, csy, bw, contH*sc); }
   }
 
   ctx.globalAlpha = 0.82;
@@ -599,8 +583,7 @@ function drawCanvas(canvas, baseW, baseH, contW, contH,
   var ts  = 'rgba(0,0,0,0.75)';
   var tf  = '#ffffff';
 
-  oText(ctx, label, cssW/2, cssH/2, tf, ts,
-        'bold '+lSz+'px Arial', 'center', 'middle');
+  oText(ctx, label, cssW/2, cssH/2, tf, ts, 'bold '+lSz+'px Arial', 'center', 'middle');
 
   var x0 = aox, y0 = aoy, x1 = x0+fw-1, y1 = y0+fh-1;
   var cf = 'bold '+cSz+'px Arial';
@@ -611,7 +594,7 @@ function drawCanvas(canvas, baseW, baseH, contW, contH,
   oText(ctx, x1+','+y1, ax+aws-pd, ay+ahs-pd, tf, ts, cf, 'right', 'bottom');
 
   if (barPx > 0) {
-    var pf  = 'bold '+pSz+'px Arial';
+    var pf = 'bold '+pSz+'px Arial';
     var ptx = barPx+'px';
     if (barType === 'letterbox') {
       var bh2 = Math.round((contH - fh) / 2) * sc;
@@ -626,13 +609,9 @@ function drawCanvas(canvas, baseW, baseH, contW, contH,
 }
 
 function drawResult(canvas, r, drawW) {
-  drawCanvas(
-    canvas,
-    r.base.w, r.base.h, r.cont.w, r.cont.h,
-    r.fit.w, r.fit.h,
-    r.fit.w + '\u00D7' + r.fit.h,
-    r.fit.barType, r.fit.barPx, drawW
-  );
+  drawCanvas(canvas, r.base.w, r.base.h, r.cont.w, r.cont.h,
+    r.fit.w, r.fit.h, r.fit.w+'\u00D7'+r.fit.h,
+    r.fit.barType, r.fit.barPx, drawW);
 }
 
 /* ════════════════════════════════════
@@ -659,40 +638,35 @@ function buildLayout() {
     var fullFillRow = '';
     if (r.fmt !== 'full') {
       var ff = ((fit.w * fit.h) / (base.w * base.h) * 100).toFixed(1);
-      fullFillRow =
-        '<div class="stat-row"><span class="stat-key">Full container fill</span>' +
-        '<span class="stat-val">' + ff + '%</span></div>';
+      fullFillRow = '<div class="stat-row"><span class="stat-key">Full container fill</span><span class="stat-val">'+ff+'%</span></div>';
     }
 
     var comp = '';
     if (fit.w % 2 !== 0) comp += '<div class="warn-box">⚠️ Width not even</div>';
     if (fit.h % 2 !== 0) comp += '<div class="warn-box">⚠️ Height not even</div>';
-    if (!comp) {
-      comp = fit.barPx === 0
-        ? '<div class="ok-box">✅ Exact fit — no bars needed</div>'
-        : '<div class="ok-box">✅ DCI compliant</div>';
-    }
+    if (!comp) comp = fit.barPx === 0
+      ? '<div class="ok-box">✅ Exact fit — no bars needed</div>'
+      : '<div class="ok-box">✅ DCI compliant</div>';
 
     html +=
       '<div class="card">' +
-        '<div class="card-title">' + base.label + ' — ' + base.w + '&times;' + base.h + '</div>' +
-        '<div class="canvas-wrap" id="wrap-' + i + '"><canvas id="cv-' + i + '"></canvas></div>' +
+        '<div class="card-title">'+base.label+' — '+base.w+'&times;'+base.h+'</div>' +
+        '<div class="canvas-wrap" id="wrap-'+i+'"><canvas id="cv-'+i+'"></canvas></div>' +
         '<hr>' +
-        '<div class="stat-row"><span class="stat-key">Container</span><span class="stat-val">' + cont.w + '&times;' + cont.h + '</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Active size</span><span class="stat-val">' + fit.w + '&times;' + fit.h + ' px</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Bar type</span><span class="stat-val">' + fit.barType + '</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Bar each side</span><span class="stat-val">' + fit.barPx + ' px</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Total bars</span><span class="stat-val">' + (fit.barPx*2) + ' px</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Container fill</span><span class="stat-val">' + contFill + '%</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Container</span><span class="stat-val">'+cont.w+'&times;'+cont.h+'</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Active size</span><span class="stat-val">'+fit.w+'&times;'+fit.h+' px</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Bar type</span><span class="stat-val">'+fit.barType+'</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Bar each side</span><span class="stat-val">'+fit.barPx+' px</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Total bars</span><span class="stat-val">'+(fit.barPx*2)+' px</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Container fill</span><span class="stat-val">'+contFill+'%</span></div>' +
         fullFillRow +
-        '<div class="stat-row"><span class="stat-key">Target ratio</span><span class="stat-val">' + r.ratioVal.toFixed(6) + '</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Actual ratio</span><span class="stat-val">' + actual + '</span></div>' +
-        '<div class="stat-row"><span class="stat-key">Coords (full frame)</span>' +
-          '<span class="stat-val">' + coords.x0 + ',' + coords.y0 + ' &rarr; ' + coords.x1 + ',' + coords.y1 + '</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Target ratio</span><span class="stat-val">'+r.ratioVal.toFixed(6)+'</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Actual ratio</span><span class="stat-val">'+actual+'</span></div>' +
+        '<div class="stat-row"><span class="stat-key">Coords (full frame)</span><span class="stat-val">'+coords.x0+','+coords.y0+' &rarr; '+coords.x1+','+coords.y1+'</span></div>' +
         comp +
         '<div class="act-row">' +
-          '<button class="act-btn" data-dl="' + i + '">⬇️ PNG</button>' +
-          '<button class="act-btn" data-cpstats="' + i + '">📋 Stats</button>' +
+          '<button class="act-btn" data-dl="'+i+'">⬇️ PNG</button>' +
+          '<button class="act-btn" data-cpstats="'+i+'">📋 Stats</button>' +
         '</div>' +
       '</div>';
   });
@@ -703,8 +677,8 @@ function buildLayout() {
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
       state.results.forEach(function(r, i) {
-        var wrap = document.getElementById('wrap-' + i);
-        var cv   = document.getElementById('cv-'   + i);
+        var wrap = document.getElementById('wrap-'+i);
+        var cv   = document.getElementById('cv-'+i);
         if (!wrap || !cv) return;
         var drawW = Math.floor(wrap.getBoundingClientRect().width || wrap.offsetWidth || 400);
         try { drawResult(cv, r, drawW); } catch(e) { console.error(e); }
@@ -721,13 +695,13 @@ function xmlPlain(r) {
   var g = gcd(r.fit.w, r.fit.h);
   var c = activeCoords(r);
   return [
-    '<!-- ' + r.base.label + ' ' + r.base.w + 'x' + r.base.h + ' -->',
+    '<!-- '+r.base.label+' '+r.base.w+'x'+r.base.h+' -->',
     '<MainPictureActiveArea>',
-    '  <ScreenAspectRatio>' + (r.fit.w/g) + ' ' + (r.fit.h/g) + '</ScreenAspectRatio>',
-    '  <ActiveAreaTopEdge>'    + c.y0 + '</ActiveAreaTopEdge>',
-    '  <ActiveAreaBottomEdge>' + c.y1 + '</ActiveAreaBottomEdge>',
-    '  <ActiveAreaLeftEdge>'   + c.x0 + '</ActiveAreaLeftEdge>',
-    '  <ActiveAreaRightEdge>'  + c.x1 + '</ActiveAreaRightEdge>',
+    '  <ScreenAspectRatio>'+(r.fit.w/g)+' '+(r.fit.h/g)+'</ScreenAspectRatio>',
+    '  <ActiveAreaTopEdge>'   +c.y0+'</ActiveAreaTopEdge>',
+    '  <ActiveAreaBottomEdge>'+c.y1+'</ActiveAreaBottomEdge>',
+    '  <ActiveAreaLeftEdge>'  +c.x0+'</ActiveAreaLeftEdge>',
+    '  <ActiveAreaRightEdge>' +c.x1+'</ActiveAreaRightEdge>',
     '</MainPictureActiveArea>',
   ].join('\n');
 }
@@ -735,9 +709,9 @@ function xmlPlain(r) {
 function xmlHighlight(plain) {
   return plain
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/^([ ]*&lt;!--.*?--&gt;)/gm, '<span class="xc">$1</span>')
-    .replace(/(&lt;\/?[A-Za-z][A-Za-z0-9]*&gt;)/g, '<span class="xt">$1</span>')
-    .replace(/&gt;(\d[^&\n]*)&lt;\//g, '&gt;<span class="xv">$1</span>&lt;\/');
+    .replace(/^([ ]*&lt;!--.*?--&gt;)/gm,'<span class="xc">$1</span>')
+    .replace(/(&lt;\/?[A-Za-z][A-Za-z0-9]*&gt;)/g,'<span class="xt">$1</span>')
+    .replace(/&gt;(\d[^&\n]*)&lt;\//g,'&gt;<span class="xv">$1</span>&lt;\/');
 }
 
 function buildXML() {
@@ -746,9 +720,9 @@ function buildXML() {
   var html = '';
   state.results.forEach(function(r, i) {
     html +=
-      '<div class="xml-pre">' + xmlHighlight(xmlPlain(r)) + '</div>' +
+      '<div class="xml-pre">'+xmlHighlight(xmlPlain(r))+'</div>' +
       '<div class="act-row" style="margin-bottom:1em;">' +
-        '<button class="act-btn primary" data-cpxml="' + i + '">📋 Copy ' + r.resKey.toUpperCase() + ' XML</button>' +
+        '<button class="act-btn primary" data-cpxml="'+i+'">📋 Copy '+r.resKey.toUpperCase()+' XML</button>' +
       '</div>';
   });
   out.innerHTML = html;
@@ -772,21 +746,18 @@ function buildReverse() {
     var base    = RES[rk];
     var cont    = getContainer(fmt, rk);
     var fit     = getFit(cont.w, cont.h, ratio);
-    var cFill   = ((wVal * hVal) / (cont.w * cont.h) * 100).toFixed(1);
-    var fFill   = ((wVal * hVal) / (base.w * base.h) * 100).toFixed(1);
-    var fillStr = fmt !== 'full' ? cFill + '% cont / ' + fFill + '% full' : cFill + '%';
-    rows +=
-      '<div class="rev-row"><strong>' + rk.toUpperCase() + '</strong> ' +
-        cont.w + '&times;' + cont.h + ' &rarr; ' +
-        fit.barPx + 'px ' + fit.barType + ' — ' + fillStr + '</div>';
+    var cFill   = ((wVal*hVal)/(cont.w*cont.h)*100).toFixed(1);
+    var fFill   = ((wVal*hVal)/(base.w*base.h)*100).toFixed(1);
+    var fillStr = fmt !== 'full' ? cFill+'% cont / '+fFill+'% full' : cFill+'%';
+    rows += '<div class="rev-row"><strong>'+rk.toUpperCase()+'</strong> '+
+      cont.w+'&times;'+cont.h+' &rarr; '+fit.barPx+'px '+fit.barType+' — '+fillStr+'</div>';
   });
 
-  var frac = (wVal/g) <= 100 ? (wVal/g) + ':' + (hVal/g) + ' — ' : '';
-
+  var frac = (wVal/g) <= 100 ? (wVal/g)+':'+(hVal/g)+' — ' : '';
   out.innerHTML =
     '<div class="card" style="margin-top:0.75em;">' +
-      '<span class="big-ratio">' + ratio.toFixed(4) + ':1</span>' +
-      '<div style="opacity:0.6;font-size:0.83em;margin-bottom:0.75em;">' + frac + wVal + '&times;' + hVal + ' px</div>' +
+      '<span class="big-ratio">'+ratio.toFixed(4)+':1</span>' +
+      '<div style="opacity:0.6;font-size:0.83em;margin-bottom:0.75em;">'+frac+wVal+'&times;'+hVal+' px</div>' +
       rows +
       '<div class="act-row" style="margin-top:0.75em;">' +
         '<button class="act-btn primary" id="use-ratio-btn">Use this ratio &rarr;</button>' +
@@ -795,8 +766,7 @@ function buildReverse() {
 
   document.getElementById('use-ratio-btn').onclick = function() {
     document.getElementById('ratio').value = ratio.toFixed(4);
-    runCalc();
-    activateTab('layout');
+    runCalc(); activateTab('layout');
   };
 }
 
@@ -809,26 +779,22 @@ function runCalc() {
   var fmt      = document.getElementById('container').value;
   var resPick  = document.getElementById('resolution').value;
 
-  try { localStorage.setItem('dci_ratio', rawRatio); localStorage.setItem('dci_fmt', fmt); localStorage.setItem('dci_res', resPick); } catch(e) {}
-  try { history.replaceState(null, '', '#r=' + encodeURIComponent(rawRatio) + '&f=' + fmt + '&res=' + resPick); } catch(e) {}
+  try { localStorage.setItem('dci_ratio',rawRatio); localStorage.setItem('dci_fmt',fmt); localStorage.setItem('dci_res',resPick); } catch(e) {}
+  try { history.replaceState(null,'','#r='+encodeURIComponent(rawRatio)+'&f='+fmt+'&res='+resPick); } catch(e) {}
 
   document.querySelectorAll('.preset-btn').forEach(function(b) {
-    b.classList.toggle('active', ratioVal !== null && Math.abs(parseFloat(b.dataset.v) - ratioVal) < 0.0001);
+    b.classList.toggle('active', ratioVal!==null && Math.abs(parseFloat(b.dataset.v)-ratioVal)<0.0001);
   });
 
-  if (!ratioVal) { state.results = []; buildLayout(); buildXML(); return; }
+  if (!ratioVal) { state.results=[]; buildLayout(); buildXML(); return; }
 
-  var keys = resPick === 'both' ? ['2k','4k'] : resPick === '2k' ? ['2k'] : ['4k'];
-
+  var keys = resPick==='both' ? ['2k','4k'] : resPick==='2k' ? ['2k'] : ['4k'];
   state.results = keys.map(function(rk) {
-    var base = RES[rk];
-    var cont = getContainer(fmt, rk);
-    var fit  = getFit(cont.w, cont.h, ratioVal);
+    var base=RES[rk], cont=getContainer(fmt,rk), fit=getFit(cont.w,cont.h,ratioVal);
     return { resKey:rk, base:base, cont:cont, fit:fit, fmt:fmt, ratioVal:ratioVal };
   });
 
-  buildLayout();
-  buildXML();
+  buildLayout(); buildXML();
 }
 
 /* ════════════════════════════════════
@@ -836,11 +802,10 @@ function runCalc() {
 ════════════════════════════════════ */
 function redrawAll() {
   state.results.forEach(function(r, i) {
-    var wrap = document.getElementById('wrap-' + i);
-    var cv   = document.getElementById('cv-'   + i);
-    if (!wrap || !cv) return;
-    var drawW = Math.floor(wrap.getBoundingClientRect().width || wrap.offsetWidth || 400);
-    try { drawResult(cv, r, drawW); } catch(e) {}
+    var wrap=document.getElementById('wrap-'+i), cv=document.getElementById('cv-'+i);
+    if (!wrap||!cv) return;
+    var drawW=Math.floor(wrap.getBoundingClientRect().width||wrap.offsetWidth||400);
+    try { drawResult(cv,r,drawW); } catch(e) {}
   });
 }
 
@@ -853,97 +818,87 @@ window.addEventListener('resize', function() {
    MODAL
 ════════════════════════════════════ */
 function openModal(idx) {
-  var r = state.results[idx];
-  if (!r) return;
-  var modal = document.getElementById('modal');
-  var mc    = document.getElementById('modal-canvas');
-  modal.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  var vw = Math.min(window.innerWidth - 32, 1400);
-  var vh = Math.min(window.innerHeight - 32, 900);
-  var asp = r.base.w / r.base.h;
-  var mw = vw, mh = vw / asp;
-  if (mh > vh) { mh = vh; mw = vh * asp; }
-  try { drawResult(mc, r, Math.floor(mw)); } catch(e) {}
+  var r=state.results[idx]; if (!r) return;
+  var modal=document.getElementById('modal'), mc=document.getElementById('modal-canvas');
+  modal.classList.add('open'); document.body.style.overflow='hidden';
+  var vw=Math.min(window.innerWidth-32,1400), vh=Math.min(window.innerHeight-32,900);
+  var asp=r.base.w/r.base.h, mw=vw, mh=vw/asp;
+  if (mh>vh) { mh=vh; mw=vh*asp; }
+  try { drawResult(mc,r,Math.floor(mw)); } catch(e) {}
 }
 
 document.getElementById('modal').addEventListener('click', function() {
   document.getElementById('modal').classList.remove('open');
-  document.body.style.overflow = '';
+  document.body.style.overflow='';
 });
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') { document.getElementById('modal').classList.remove('open'); document.body.style.overflow = ''; }
+  if (e.key==='Escape') { document.getElementById('modal').classList.remove('open'); document.body.style.overflow=''; }
 });
 
 /* ════════════════════════════════════
    TOAST
 ════════════════════════════════════ */
 function toast(msg) {
-  var el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
   clearTimeout(state.toastTimer);
-  state.toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2200);
+  state.toastTimer=setTimeout(function(){ el.classList.remove('show'); },2200);
 }
 
 /* ════════════════════════════════════
    EVENT DELEGATION
 ════════════════════════════════════ */
 document.getElementById('layout-out').addEventListener('click', function(e) {
-  var btn = e.target.closest('button');
-  if (!btn) return;
-  var idx = parseInt(btn.getAttribute('data-dl') !== null ? btn.getAttribute('data-dl') : btn.getAttribute('data-cpstats'), 10);
-  var r   = state.results[idx];
-  if (!r) return;
+  var btn=e.target.closest('button'); if (!btn) return;
+  var idx=parseInt(btn.getAttribute('data-dl')!==null?btn.getAttribute('data-dl'):btn.getAttribute('data-cpstats'),10);
+  var r=state.results[idx]; if (!r) return;
 
   if (btn.hasAttribute('data-dl')) {
-    var tmp = document.createElement('canvas');
-    try { drawResult(tmp, r, Math.round(r.base.w / 4)); } catch(e) { return; }
-    var a = document.createElement('a');
-    a.download = 'dci-' + r.resKey + '-' + r.fit.w + 'x' + r.fit.h + '.png';
-    a.href = tmp.toDataURL('image/png'); a.click();
+    var tmp=document.createElement('canvas');
+    try { drawResult(tmp,r,Math.round(r.base.w/4)); } catch(e) { return; }
+    var a=document.createElement('a');
+    a.download='dci-'+r.resKey+'-'+r.fit.w+'x'+r.fit.h+'.png';
+    a.href=tmp.toDataURL('image/png'); a.click();
     toast('PNG downloaded');
   }
 
   if (btn.hasAttribute('data-cpstats')) {
-    var coords   = activeCoords(r);
-    var contFill = ((r.fit.w * r.fit.h) / (r.cont.w * r.cont.h) * 100).toFixed(1);
-    var fullLine = '';
-    if (r.fmt !== 'full') {
-      fullLine = '\nFull fill  : ' + ((r.fit.w * r.fit.h) / (r.base.w * r.base.h) * 100).toFixed(1) + '%';
-    }
-    var txt = [
-      'DCI ' + r.resKey.toUpperCase() + ' Layout',
-      'Full frame : ' + r.base.w + ' x ' + r.base.h,
-      'Container  : ' + r.cont.w + ' x ' + r.cont.h,
-      'Active     : ' + r.fit.w  + ' x ' + r.fit.h,
-      'Bar type   : ' + r.fit.barType,
-      'Bar size   : ' + r.fit.barPx + ' px each side',
-      'Cont fill  : ' + contFill + '%' + fullLine,
-      'Coords     : ' + coords.x0+','+coords.y0+' -> '+coords.x1+','+coords.y1,
-      'Ratio      : ' + r.ratioVal.toFixed(4),
+    var coords=activeCoords(r);
+    var contFill=((r.fit.w*r.fit.h)/(r.cont.w*r.cont.h)*100).toFixed(1);
+    var fullLine='';
+    if (r.fmt!=='full') fullLine='\nFull fill  : '+((r.fit.w*r.fit.h)/(r.base.w*r.base.h)*100).toFixed(1)+'%';
+    var txt=[
+      'DCI '+r.resKey.toUpperCase()+' Layout',
+      'Full frame : '+r.base.w+' x '+r.base.h,
+      'Container  : '+r.cont.w+' x '+r.cont.h,
+      'Active     : '+r.fit.w+' x '+r.fit.h,
+      'Bar type   : '+r.fit.barType,
+      'Bar size   : '+r.fit.barPx+' px each side',
+      'Cont fill  : '+contFill+'%'+fullLine,
+      'Coords     : '+coords.x0+','+coords.y0+' -> '+coords.x1+','+coords.y1,
+      'Ratio      : '+r.ratioVal.toFixed(4),
     ].join('\n');
-    navigator.clipboard.writeText(txt).then(function() { toast('Stats copied!'); }).catch(function() { toast('Copy failed'); });
+    navigator.clipboard.writeText(txt).then(function(){ toast('Stats copied!'); }).catch(function(){ toast('Copy failed'); });
   }
 });
 
 document.getElementById('xml-out').addEventListener('click', function(e) {
-  var btn = e.target.closest('button');
-  if (!btn || !btn.hasAttribute('data-cpxml')) return;
-  var r = state.results[parseInt(btn.getAttribute('data-cpxml'), 10)];
+  var btn=e.target.closest('button');
+  if (!btn||!btn.hasAttribute('data-cpxml')) return;
+  var r=state.results[parseInt(btn.getAttribute('data-cpxml'),10)];
   if (!r) return;
-  navigator.clipboard.writeText(xmlPlain(r)).then(function() { toast('XML copied!'); }).catch(function() { toast('Copy failed'); });
+  navigator.clipboard.writeText(xmlPlain(r)).then(function(){ toast('XML copied!'); }).catch(function(){ toast('Copy failed'); });
 });
 
 /* ════════════════════════════════════
    TABS
 ════════════════════════════════════ */
 function activateTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
-  document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.toggle('active', p.id === 'pane-' + name); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active',b.getAttribute('data-tab')===name); });
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.toggle('active',p.id==='pane-'+name); });
 }
-document.querySelectorAll('.tab-btn').forEach(function(b) {
-  b.addEventListener('click', function() { activateTab(b.getAttribute('data-tab')); });
+document.querySelectorAll('.tab-btn').forEach(function(b){
+  b.addEventListener('click',function(){ activateTab(b.getAttribute('data-tab')); });
 });
 
 /* ════════════════════════════════════
@@ -951,59 +906,93 @@ document.querySelectorAll('.tab-btn').forEach(function(b) {
 ════════════════════════════════════ */
 document.getElementById('themeBtn').addEventListener('click', function() {
   document.body.classList.toggle('light');
-  var light = document.body.classList.contains('light');
-  this.textContent = light ? '☀️' : '🌙';
-  try { localStorage.setItem('dci_theme', light ? 'light' : 'dark'); } catch(e) {}
+  var light=document.body.classList.contains('light');
+  this.textContent=light?'☀️':'🌙';
+  try { localStorage.setItem('dci_theme',light?'light':'dark'); } catch(e) {}
   redrawAll();
 });
 
 document.getElementById('shareBtn').addEventListener('click', function() {
   if (navigator.share) {
-    navigator.share({ title: 'DCI Calc', url: window.location.href })
-      .catch(function() {});
+    navigator.share({ title:'DCI Calc', url:window.location.href }).catch(function(){});
   } else {
     navigator.clipboard.writeText(window.location.href)
-      .then(function() { toast('URL copied!'); })
-      .catch(function() { toast('Copy failed'); });
+      .then(function(){ toast('URL copied!'); }).catch(function(){ toast('Copy failed'); });
   }
 });
 
 /* ════════════════════════════════════
    PWA INSTALL BANNER
 ════════════════════════════════════ */
-window.addEventListener('beforeinstallprompt', function(e) {
-  e.preventDefault();
-  state.deferredPWA = e;
-  document.getElementById('install-bar').classList.add('show');
-});
+(function() {
+  var bar        = document.getElementById('install-bar');
+  var msg        = document.getElementById('install-msg');
+  var installBtn = document.getElementById('install-btn');
+  var dismissBtn = document.getElementById('install-bar-dismiss');
 
-document.getElementById('install-btn').addEventListener('click', function() {
-  if (!state.deferredPWA) return;
-  state.deferredPWA.prompt();
-  state.deferredPWA.userChoice.then(function() {
-    state.deferredPWA = null;
-    document.getElementById('install-bar').classList.remove('show');
-  });
-});
+  /* Don't show if already running as installed PWA */
+  var isStandalone = window.navigator.standalone === true
+    || window.matchMedia('(display-mode: standalone)').matches;
+  if (isStandalone) return;
 
-document.getElementById('install-bar-dismiss').addEventListener('click', function() {
-  document.getElementById('install-bar').classList.remove('show');
-});
+  /* Don't show if user already dismissed */
+  try { if (localStorage.getItem('install-dismissed')==='1') return; } catch(e) {}
 
-window.addEventListener('appinstalled', function() {
-  document.getElementById('install-bar').classList.remove('show');
-  toast('App installed! ✅');
-});
+  /* ✅ Detect iOS — beforeinstallprompt is not fired on iOS */
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase())
+    && !window.MSStream;
+
+  if (isIOS) {
+    /* Show manual instruction for iOS Safari */
+    msg.innerHTML = '📲 Tap <strong>Share ⬆️</strong> then <strong>Add to Home Screen</strong>';
+    bar.classList.add('show');
+
+    dismissBtn.addEventListener('click', function() {
+      bar.classList.remove('show');
+      try { localStorage.setItem('install-dismissed','1'); } catch(e) {}
+    });
+
+  } else {
+    /* Android / Chrome — use native install prompt */
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      state.deferredPWA = e;
+      msg.textContent   = '📲 Add DCI Calc to your home screen for offline use';
+      installBtn.style.display = '';
+      bar.classList.add('show');
+    });
+
+    installBtn.addEventListener('click', function() {
+      if (!state.deferredPWA) return;
+      state.deferredPWA.prompt();
+      state.deferredPWA.userChoice.then(function(result) {
+        state.deferredPWA = null;
+        bar.classList.remove('show');
+        if (result.outcome==='accepted') toast('App installed! ✅');
+      });
+    });
+
+    dismissBtn.addEventListener('click', function() {
+      bar.classList.remove('show');
+      try { localStorage.setItem('install-dismissed','1'); } catch(e) {}
+    });
+
+    window.addEventListener('appinstalled', function() {
+      bar.classList.remove('show');
+      toast('App installed! ✅');
+    });
+  }
+}());
 
 /* ════════════════════════════════════
    PRESETS
 ════════════════════════════════════ */
 (function() {
-  var row = document.getElementById('presets');
+  var row=document.getElementById('presets');
   PRESETS.forEach(function(p) {
-    var btn = document.createElement('button');
-    btn.className = 'preset-btn'; btn.textContent = p.label; btn.dataset.v = p.v;
-    btn.addEventListener('click', function() { document.getElementById('ratio').value = p.v; runCalc(); });
+    var btn=document.createElement('button');
+    btn.className='preset-btn'; btn.textContent=p.label; btn.dataset.v=p.v;
+    btn.addEventListener('click',function(){ document.getElementById('ratio').value=p.v; runCalc(); });
     row.appendChild(btn);
   });
 }());
@@ -1011,36 +1000,35 @@ window.addEventListener('appinstalled', function() {
 /* ════════════════════════════════════
    INPUTS
 ════════════════════════════════════ */
-function debounce(fn, ms) { var t; return function() { clearTimeout(t); t = setTimeout(fn, ms); }; }
+function debounce(fn,ms){ var t; return function(){ clearTimeout(t); t=setTimeout(fn,ms); }; }
 
-document.getElementById('ratio').addEventListener('input', debounce(runCalc, 280));
-document.getElementById('container').addEventListener('change', runCalc);
-document.getElementById('resolution').addEventListener('change', runCalc);
-document.getElementById('ratio').addEventListener('focus', function() { this.select(); });
-document.getElementById('rev-w').addEventListener('input', debounce(buildReverse, 300));
-document.getElementById('rev-h').addEventListener('input', debounce(buildReverse, 300));
+document.getElementById('ratio').addEventListener('input',debounce(runCalc,280));
+document.getElementById('container').addEventListener('change',runCalc);
+document.getElementById('resolution').addEventListener('change',runCalc);
+document.getElementById('ratio').addEventListener('focus',function(){ this.select(); });
+document.getElementById('rev-w').addEventListener('input',debounce(buildReverse,300));
+document.getElementById('rev-h').addEventListener('input',debounce(buildReverse,300));
 
 /* ════════════════════════════════════
    INIT
 ════════════════════════════════════ */
 (function() {
-  try { if (localStorage.getItem('dci_theme') === 'light') { document.body.classList.add('light'); document.getElementById('themeBtn').textContent = '☀️'; } } catch(e) {}
-  var params = new URLSearchParams(window.location.hash.slice(1));
-  function ls(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
-  document.getElementById('ratio').value      = params.get('r')   || ls('dci_ratio') || '2.39';
-  document.getElementById('container').value  = params.get('f')   || ls('dci_fmt')   || 'full';
-  document.getElementById('resolution').value = params.get('res') || ls('dci_res')   || 'both';
+  try { if (localStorage.getItem('dci_theme')==='light'){ document.body.classList.add('light'); document.getElementById('themeBtn').textContent='☀️'; } } catch(e) {}
+  var params=new URLSearchParams(window.location.hash.slice(1));
+  function ls(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  document.getElementById('ratio').value      = params.get('r')  ||ls('dci_ratio')||'2.39';
+  document.getElementById('container').value  = params.get('f')  ||ls('dci_fmt')  ||'full';
+  document.getElementById('resolution').value = params.get('res')||ls('dci_res')  ||'both';
   runCalc();
 }());
 </script>
 
-<!-- Service Worker registration -->
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('./sw.js')
-      .then(function(reg) { console.log('SW registered:', reg.scope); })
-      .catch(function(err) { console.warn('SW failed:', err); });
+      .then(function(reg){ console.log('SW:',reg.scope); })
+      .catch(function(err){ console.warn('SW failed:',err); });
   });
 }
 </script>
