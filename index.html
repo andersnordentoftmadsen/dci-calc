@@ -16,7 +16,7 @@
 body.light{--bg:#f0f0f0;--fg:#111;--accent:#0055cc;--card:#fff;--inp:#e4e4e4;--bdr:#ccc;--warn:#b60;--err:#c00;--ok:#077}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--fg);font-family:Arial,sans-serif;min-height:100vh;overscroll-behavior:none}
-#header{background:var(--card);border-bottom:1px solid var(--bdr);padding:0.7em 1em;padding-top:max(0.7em,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+#header{background:var(--card);border-bottom:1px solid var(--bdr);padding:.7em 1em;padding-top:max(.7em,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 #header h1{color:var(--accent);font-size:1.15em}
 #header-btns{display:flex;gap:.5em}
 #main{max-width:980px;margin:0 auto;padding:1em;padding-bottom:max(1em,env(safe-area-inset-bottom))}
@@ -34,11 +34,14 @@ input[type=text]:focus,select:focus{outline:none;border-color:var(--accent)}
 .tb{background:none;border:none;border-bottom:3px solid transparent;color:var(--fg);padding:.65em 1em;font-size:.92em;cursor:pointer;opacity:.5;margin-bottom:-2px;min-height:44px}
 .tb.active{opacity:1;border-bottom-color:var(--accent);font-weight:bold}
 .tp{display:none}.tp.active{display:block}
+/* card inner — stacked on mobile */
+.card-inner{display:block}
+.stats-col{margin-top:.5em}
 .rg{display:grid;grid-template-columns:1fr 1fr;gap:1em}
 @media(max-width:580px){.rg{grid-template-columns:1fr}}
 .cw{margin:.5em 0}
 canvas{display:block;width:100%;height:auto;border:1px solid var(--bdr);border-radius:4px;cursor:zoom-in}
-.sr{display:flex;justify-content:space-between;padding:.32em 0;border-bottom:1px solid var(--bdr);font-size:.88em}
+.sr{display:flex;justify-content:space-between;padding:.3em 0;border-bottom:1px solid var(--bdr);font-size:.88em}
 .sr:last-child{border-bottom:none}
 .sk{opacity:.6}.sv{font-weight:bold}
 .wb{margin-top:.5em;padding:.35em .55em;border-radius:4px;font-size:.83em;border-left:3px solid var(--warn);background:rgba(255,170,0,.09);color:var(--warn)}
@@ -66,6 +69,65 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
 #ibar.show{display:flex}
 #ibar button{background:var(--accent);color:#000;border:none;padding:.4em 1em;border-radius:5px;font-weight:bold;cursor:pointer;white-space:nowrap;min-height:36px}
 #idismiss{background:none!important;color:var(--fg)!important;opacity:.5;font-weight:normal!important}
+
+/* ══════════════════════════════════════
+   DESKTOP — no-scroll 16:9 layout
+══════════════════════════════════════ */
+@media(min-width:900px){
+  html,body{height:100%;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  #ibar{flex-shrink:0}
+  #header{flex-shrink:0;padding:.45em 1.25em}
+  #header h1{font-size:1.05em}
+  .ib{min-height:36px;padding:.3em .65em;font-size:.9em}
+
+  #main{
+    flex:1;display:flex;flex-direction:column;overflow:hidden;
+    max-width:none;padding:.5em 1.25em;margin:0
+  }
+  #settings-strip{flex-shrink:0}
+  #settings-strip .card{padding:.55em .75em;margin-bottom:.4em}
+  #settings-strip .ct{margin-bottom:.35em}
+  #settings-strip input[type=text],
+  #settings-strip select{min-height:34px;font-size:.88em;padding:.3em .5em}
+  #settings-strip .presets{margin-top:.35em;gap:.3em}
+  #settings-strip .pb{min-height:28px;padding:.22em .55em;font-size:.78em}
+
+  .tabs{flex-shrink:0;margin-bottom:.5em}
+  .tb{padding:.42em .9em;font-size:.87em;min-height:36px}
+
+  #panes-container{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .tp.active{flex:1;overflow-y:auto;overflow-x:hidden}
+
+  /* Results grid fills available height */
+  .rg{grid-template-columns:1fr 1fr;height:100%;align-content:start}
+  .rg .card{margin-bottom:0;display:flex;flex-direction:column}
+
+  /* Horizontal card layout: canvas left, stats right */
+  .card-inner{
+    display:flex;gap:.75em;align-items:flex-start;flex:1
+  }
+  .canvas-col{flex:1;min-width:0;display:flex;flex-direction:column}
+  .cw{flex:1}
+  .stats-col{flex:0 0 210px;margin-top:0}
+
+  /* Compact stats */
+  .sr{padding:.18em 0;font-size:.82em}
+  .wb,.ob{font-size:.78em;padding:.22em .45em;margin-top:.3em}
+  .ar{margin-top:.4em;gap:.35em}
+  .ab{min-height:32px;font-size:.8em;padding:.3em .5em}
+  hr{margin:.35em 0}
+
+  /* Single result (2K or 4K only) — wider canvas */
+  .solo-card .stats-col{flex:0 0 240px}
+
+  /* XML tab compact */
+  #pane-xml .card{height:100%}
+  .xp{font-size:.78em;line-height:1.55}
+
+  /* Reverse tab */
+  #pane-reverse .card{max-width:600px}
+}
 </style>
 </head>
 <body>
@@ -87,59 +149,80 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
 </div>
 
 <div id="main">
-  <div class="card">
-    <div class="ct">Settings</div>
-    <div class="cg">
-      <label class="cl">Aspect Ratio
-        <input type="text" id="ratio" placeholder="e.g. 2.39 or 16:9" autocomplete="off" spellcheck="false" inputmode="decimal">
-      </label>
-      <label class="cl">Container
-        <select id="container">
-          <option value="full">Full  (2048×1080 / 4096×2160)</option>
-          <option value="flat">Flat  (1998×1080 / 3996×2160)</option>
-          <option value="scope">Scope (2048×858  / 4096×1718)</option>
-        </select>
-      </label>
-      <label class="cl">Resolution
-        <select id="resolution">
-          <option value="both">Both 2K &amp; 4K</option>
-          <option value="2k">2K only</option>
-          <option value="4k">4K only</option>
-        </select>
-      </label>
+
+  <!-- Settings strip -->
+  <div id="settings-strip">
+    <div class="card">
+      <div class="cg">
+        <label class="cl">Aspect Ratio
+          <input type="text" id="ratio" placeholder="e.g. 2.39 or 16:9"
+                 autocomplete="off" spellcheck="false" inputmode="decimal">
+        </label>
+        <label class="cl">Container
+          <select id="container">
+            <option value="full">Full  (2048×1080 / 4096×2160)</option>
+            <option value="flat">Flat  (1998×1080 / 3996×2160)</option>
+            <option value="scope">Scope (2048×858  / 4096×1718)</option>
+          </select>
+        </label>
+        <label class="cl">Resolution
+          <select id="resolution">
+            <option value="both">Both 2K &amp; 4K</option>
+            <option value="2k">2K only</option>
+            <option value="4k">4K only</option>
+          </select>
+        </label>
+      </div>
+      <div class="presets" id="presets"></div>
     </div>
-    <div class="ct" style="margin-top:1em;margin-bottom:.4em">Quick Presets</div>
-    <div class="presets" id="presets"></div>
   </div>
 
+  <!-- Tabs -->
   <div class="tabs">
     <button class="tb active" data-tab="layout">📐 Layout</button>
     <button class="tb" data-tab="xml">📄 DCP XML</button>
     <button class="tb" data-tab="reverse">🔄 Reverse</button>
   </div>
 
-  <div class="tp active" id="pane-layout"><div id="layout-out"></div></div>
+  <!-- Panes -->
+  <div id="panes-container">
 
-  <div class="tp" id="pane-xml">
-    <div class="card">
-      <div class="ct">SMPTE 429-8 — MainPictureActiveArea</div>
-      <p style="font-size:.83em;opacity:.6;margin-bottom:.5em">Ready-to-paste XML for your DCP composition playlist.</p>
-      <div id="xml-out"></div>
+    <div class="tp active" id="pane-layout">
+      <div id="layout-out"></div>
     </div>
-  </div>
 
-  <div class="tp" id="pane-reverse">
-    <div class="card">
-      <div class="ct">Reverse Lookup — Pixels → Ratio</div>
-      <p style="font-size:.83em;opacity:.6;margin-bottom:.75em">Enter your active frame dimensions to find the aspect ratio and bar sizes.</p>
-      <div class="rev-grid">
-        <label class="cl">Width (px)<input type="text" id="rev-w" placeholder="e.g. 1998" autocomplete="off" inputmode="numeric"></label>
-        <label class="cl">Height (px)<input type="text" id="rev-h" placeholder="e.g. 1080" autocomplete="off" inputmode="numeric"></label>
+    <div class="tp" id="pane-xml">
+      <div class="card">
+        <div class="ct">SMPTE 429-8 — MainPictureActiveArea</div>
+        <p style="font-size:.83em;opacity:.6;margin-bottom:.5em">
+          Ready-to-paste XML for your DCP composition playlist.
+        </p>
+        <div id="xml-out"></div>
       </div>
-      <div id="rev-out"></div>
     </div>
-  </div>
-</div>
+
+    <div class="tp" id="pane-reverse">
+      <div class="card">
+        <div class="ct">Reverse Lookup — Pixels → Ratio</div>
+        <p style="font-size:.83em;opacity:.6;margin-bottom:.75em">
+          Enter your active frame dimensions to find the aspect ratio and bar sizes.
+        </p>
+        <div class="rev-grid">
+          <label class="cl">Width (px)
+            <input type="text" id="rev-w" placeholder="e.g. 1998"
+                   autocomplete="off" inputmode="numeric">
+          </label>
+          <label class="cl">Height (px)
+            <input type="text" id="rev-h" placeholder="e.g. 1080"
+                   autocomplete="off" inputmode="numeric">
+          </label>
+        </div>
+        <div id="rev-out"></div>
+      </div>
+    </div>
+
+  </div><!-- /panes-container -->
+</div><!-- /main -->
 
 <div id="modal"><canvas id="mc"></canvas></div>
 <div id="toast"></div>
@@ -153,16 +236,15 @@ var PRESETS=[
 ];
 var RES={'2k':{w:2048,h:1080,label:'DCI 2K'},'4k':{w:4096,h:2160,label:'DCI 4K'}};
 var CONTAINERS={
-  full: {'2k':{w:2048,h:1080},'4k':{w:4096,h:2160}},
-  flat: {'2k':{w:1998,h:1080},'4k':{w:3996,h:2160}},
-  scope:{'2k':{w:2048,h:858}, '4k':{w:4096,h:1718}},
+  full:{'2k':{w:2048,h:1080},'4k':{w:4096,h:2160}},
+  flat:{'2k':{w:1998,h:1080},'4k':{w:3996,h:2160}},
+  scope:{'2k':{w:2048,h:858},'4k':{w:4096,h:1718}},
 };
-var RATIO_EPS=0.005, SNAP_EPS=0.01;
+var RATIO_EPS=0.005,SNAP_EPS=0.01;
 var state={results:[],resizeRaf:null,toastTimer:null,deferredPWA:null};
 
 function parseRatio(raw){
-  var s=raw.trim().replace(/[^0-9.:/]/g,'');
-  if(!s)return null;
+  var s=raw.trim().replace(/[^0-9.:/]/g,'');if(!s)return null;
   var sep=s.indexOf(':')>=0?':':s.indexOf('/')>=0?'/':null;
   if(sep){var p=s.split(sep).map(Number);return(p.length===2&&p[0]>0&&p[1]>0&&!isNaN(p[0])&&!isNaN(p[1]))?p[0]/p[1]:null;}
   var n=parseFloat(s);return(n>0&&!isNaN(n))?n:null;
@@ -196,7 +278,6 @@ function stripePattern(ctx,rgba){
   g.beginPath();g.moveTo(0,14);g.lineTo(14,0);g.stroke();
   return ctx.createPattern(p,'repeat');
 }
-
 function oText(ctx,txt,x,y,fill,stk,font,align,base){
   ctx.save();ctx.font=font;ctx.textAlign=align;ctx.textBaseline=base;
   ctx.lineWidth=3;ctx.strokeStyle=stk;ctx.strokeText(txt,x,y);
@@ -240,48 +321,72 @@ function drawCanvas(canvas,baseW,baseH,contW,contH,fw,fh,label,barType,barPx,dra
     else{var bw2=Math.round((contW-fw)/2)*sc;oText(ctx,ptx,csx+bw2/2,cssH/2,tf,ts,pf,'center','middle');oText(ctx,ptx,ax+aws+bw2/2,cssH/2,tf,ts,pf,'center','middle');}
   }
 }
-
 function drawResult(canvas,r,drawW){
-  drawCanvas(canvas,r.base.w,r.base.h,r.cont.w,r.cont.h,r.fit.w,r.fit.h,r.fit.w+'\u00D7'+r.fit.h,r.fit.barType,r.fit.barPx,drawW);
+  drawCanvas(canvas,r.base.w,r.base.h,r.cont.w,r.cont.h,r.fit.w,r.fit.h,
+    r.fit.w+'\u00D7'+r.fit.h,r.fit.barType,r.fit.barPx,drawW);
 }
 
+/* ── Build Layout ──
+   Desktop: card-inner = flex row (canvas-col | stats-col)
+   Mobile:  card-inner = block (stacked)
+*/
 function buildLayout(){
   var out=document.getElementById('layout-out');
   if(!state.results.length){out.innerHTML='<p class="eb">❌ Invalid aspect ratio.</p>';return;}
-  var multi=state.results.length>1,html=multi?'<div class="rg">':'<div>';
+  var multi=state.results.length>1;
+  var html=multi?'<div class="rg">':'<div class="rg solo">';
+
   state.results.forEach(function(r,i){
     var fit=r.fit,cont=r.cont,base=r.base,coords=activeCoords(r);
-    var cf=((fit.w*fit.h)/(cont.w*cont.h)*100).toFixed(1),actual=(fit.w/fit.h).toFixed(6);
+    var cf=((fit.w*fit.h)/(cont.w*cont.h)*100).toFixed(1);
+    var actual=(fit.w/fit.h).toFixed(6);
+
     var ffr='';
-    if(r.fmt!=='full'){var ff=((fit.w*fit.h)/(base.w*base.h)*100).toFixed(1);ffr='<div class="sr"><span class="sk">Full container fill</span><span class="sv">'+ff+'%</span></div>';}
+    if(r.fmt!=='full'){
+      var ff=((fit.w*fit.h)/(base.w*base.h)*100).toFixed(1);
+      ffr='<div class="sr"><span class="sk">Full container fill</span><span class="sv">'+ff+'%</span></div>';
+    }
+
     var comp='';
     if(fit.w%2!==0)comp+='<div class="wb">⚠️ Width not even</div>';
     if(fit.h%2!==0)comp+='<div class="wb">⚠️ Height not even</div>';
-    if(!comp)comp=fit.barPx===0?'<div class="ob">✅ Exact fit — no bars needed</div>':'<div class="ob">✅ DCI compliant</div>';
+    if(!comp)comp=fit.barPx===0
+      ?'<div class="ob">✅ Exact fit — no bars needed</div>'
+      :'<div class="ob">✅ DCI compliant</div>';
+
     html+=
-      '<div class="card">'+
+      '<div class="card '+(multi?'':'solo-card')+'">' +
         '<div class="ct">'+base.label+' — '+base.w+'&times;'+base.h+'</div>'+
-        '<div class="cw" id="wrap-'+i+'"><canvas id="cv-'+i+'"></canvas></div>'+
-        '<hr>'+
-        '<div class="sr"><span class="sk">Container</span><span class="sv">'+cont.w+'&times;'+cont.h+'</span></div>'+
-        '<div class="sr"><span class="sk">Active size</span><span class="sv">'+fit.w+'&times;'+fit.h+' px</span></div>'+
-        '<div class="sr"><span class="sk">Bar type</span><span class="sv">'+fit.barType+'</span></div>'+
-        '<div class="sr"><span class="sk">Bar each side</span><span class="sv">'+fit.barPx+' px</span></div>'+
-        '<div class="sr"><span class="sk">Total bars</span><span class="sv">'+(fit.barPx*2)+' px</span></div>'+
-        '<div class="sr"><span class="sk">Container fill</span><span class="sv">'+cf+'%</span></div>'+
-        ffr+
-        '<div class="sr"><span class="sk">Target ratio</span><span class="sv">'+r.ratioVal.toFixed(6)+'</span></div>'+
-        '<div class="sr"><span class="sk">Actual ratio</span><span class="sv">'+actual+'</span></div>'+
-        '<div class="sr"><span class="sk">Coords (full frame)</span><span class="sv">'+coords.x0+','+coords.y0+' &rarr; '+coords.x1+','+coords.y1+'</span></div>'+
-        comp+
-        '<div class="ar">'+
-          '<button class="ab" data-dl="'+i+'">⬇️ PNG</button>'+
-          '<button class="ab" data-cpstats="'+i+'">📋 Stats</button>'+
+        '<div class="card-inner">'+
+          /* canvas column */
+          '<div class="canvas-col">'+
+            '<div class="cw" id="wrap-'+i+'"><canvas id="cv-'+i+'"></canvas></div>'+
+          '</div>'+
+          /* stats column */
+          '<div class="stats-col">'+
+            '<div class="sr"><span class="sk">Container</span><span class="sv">'+cont.w+'&times;'+cont.h+'</span></div>'+
+            '<div class="sr"><span class="sk">Active size</span><span class="sv">'+fit.w+'&times;'+fit.h+' px</span></div>'+
+            '<div class="sr"><span class="sk">Bar type</span><span class="sv">'+fit.barType+'</span></div>'+
+            '<div class="sr"><span class="sk">Bar each side</span><span class="sv">'+fit.barPx+' px</span></div>'+
+            '<div class="sr"><span class="sk">Total bars</span><span class="sv">'+(fit.barPx*2)+' px</span></div>'+
+            '<div class="sr"><span class="sk">Container fill</span><span class="sv">'+cf+'%</span></div>'+
+            ffr+
+            '<div class="sr"><span class="sk">Target ratio</span><span class="sv">'+r.ratioVal.toFixed(6)+'</span></div>'+
+            '<div class="sr"><span class="sk">Actual ratio</span><span class="sv">'+actual+'</span></div>'+
+            '<div class="sr"><span class="sk">Coords</span><span class="sv">'+coords.x0+','+coords.y0+' &rarr; '+coords.x1+','+coords.y1+'</span></div>'+
+            comp+
+            '<div class="ar">'+
+              '<button class="ab" data-dl="'+i+'">⬇️ PNG</button>'+
+              '<button class="ab" data-cpstats="'+i+'">📋 Stats</button>'+
+            '</div>'+
+          '</div>'+
         '</div>'+
       '</div>';
   });
+
   html+='</div>';
   out.innerHTML=html;
+
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     state.results.forEach(function(r,i){
       var wrap=document.getElementById('wrap-'+i),cv=document.getElementById('cv-'+i);
@@ -304,14 +409,12 @@ function xmlPlain(r){
     '  <ActiveAreaRightEdge>'+c.x1+'</ActiveAreaRightEdge>',
     '</MainPictureActiveArea>'].join('\n');
 }
-
 function xmlHighlight(plain){
   return plain.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/^([ ]*&lt;!--.*?--&gt;)/gm,'<span class="xc">$1</span>')
     .replace(/(&lt;\/?[A-Za-z][A-Za-z0-9]*&gt;)/g,'<span class="xt">$1</span>')
     .replace(/&gt;(\d[^&\n]*)&lt;\//g,'&gt;<span class="xv">$1</span>&lt;\/');
 }
-
 function buildXML(){
   var out=document.getElementById('xml-out');
   if(!state.results.length){out.innerHTML='';return;}
@@ -340,9 +443,10 @@ function buildReverse(){
     '<span class="br">'+ratio.toFixed(4)+':1</span>'+
     '<div style="opacity:.6;font-size:.83em;margin-bottom:.75em">'+frac+wVal+'&times;'+hVal+' px</div>'+
     rows+
-    '<div class="ar" style="margin-top:.75em"><button class="ab p" id="urb">Use this ratio &rarr;</button></div>'+
-    '</div>';
-  document.getElementById('urb').onclick=function(){document.getElementById('ratio').value=ratio.toFixed(4);runCalc();activateTab('layout');};
+    '<div class="ar" style="margin-top:.75em"><button class="ab p" id="urb">Use this ratio &rarr;</button></div></div>';
+  document.getElementById('urb').onclick=function(){
+    document.getElementById('ratio').value=ratio.toFixed(4);runCalc();activateTab('layout');
+  };
 }
 
 function runCalc(){
@@ -352,7 +456,9 @@ function runCalc(){
   var rp=document.getElementById('resolution').value;
   try{localStorage.setItem('dci_ratio',raw);localStorage.setItem('dci_fmt',fmt);localStorage.setItem('dci_res',rp);}catch(e){}
   try{history.replaceState(null,'','#r='+encodeURIComponent(raw)+'&f='+fmt+'&res='+rp);}catch(e){}
-  document.querySelectorAll('.pb').forEach(function(b){b.classList.toggle('active',rv!==null&&Math.abs(parseFloat(b.dataset.v)-rv)<0.0001);});
+  document.querySelectorAll('.pb').forEach(function(b){
+    b.classList.toggle('active',rv!==null&&Math.abs(parseFloat(b.dataset.v)-rv)<0.0001);
+  });
   if(!rv){state.results=[];buildLayout();buildXML();return;}
   var keys=rp==='both'?['2k','4k']:rp==='2k'?['2k']:['4k'];
   state.results=keys.map(function(rk){
@@ -377,7 +483,10 @@ function redrawAll(){
     try{drawResult(cv,r,drawW);}catch(e){}
   });
 }
-window.addEventListener('resize',function(){cancelAnimationFrame(state.resizeRaf);state.resizeRaf=requestAnimationFrame(redrawAll);});
+window.addEventListener('resize',function(){
+  cancelAnimationFrame(state.resizeRaf);
+  state.resizeRaf=requestAnimationFrame(redrawAll);
+});
 
 function openModal(idx){
   var r=state.results[idx];if(!r)return;
@@ -387,12 +496,17 @@ function openModal(idx){
   if(mh>vh){mh=vh;mw=vh*asp;}
   try{drawResult(document.getElementById('mc'),r,Math.floor(mw));}catch(e){}
 }
-document.getElementById('modal').addEventListener('click',function(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}});
+document.getElementById('modal').addEventListener('click',function(){
+  document.getElementById('modal').classList.remove('open');document.body.style.overflow='';
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
+});
 
 function toast(msg){
   var el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
-  clearTimeout(state.toastTimer);state.toastTimer=setTimeout(function(){el.classList.remove('show');},2200);
+  clearTimeout(state.toastTimer);
+  state.toastTimer=setTimeout(function(){el.classList.remove('show');},2200);
 }
 
 document.getElementById('layout-out').addEventListener('click',function(e){
@@ -402,13 +516,24 @@ document.getElementById('layout-out').addEventListener('click',function(e){
   if(btn.hasAttribute('data-dl')){
     var tmp=document.createElement('canvas');
     try{drawResult(tmp,r,Math.round(r.base.w/4));}catch(e){return;}
-    var a=document.createElement('a');a.download='dci-'+r.resKey+'-'+r.fit.w+'x'+r.fit.h+'.png';a.href=tmp.toDataURL('image/png');a.click();
-    toast('PNG downloaded');
+    var a=document.createElement('a');
+    a.download='dci-'+r.resKey+'-'+r.fit.w+'x'+r.fit.h+'.png';
+    a.href=tmp.toDataURL('image/png');a.click();toast('PNG downloaded');
   }
   if(btn.hasAttribute('data-cpstats')){
-    var coords=activeCoords(r),cf=((r.fit.w*r.fit.h)/(r.cont.w*r.cont.h)*100).toFixed(1),fl='';
+    var coords=activeCoords(r),cf2=((r.fit.w*r.fit.h)/(r.cont.w*r.cont.h)*100).toFixed(1),fl='';
     if(r.fmt!=='full')fl='\nFull fill  : '+((r.fit.w*r.fit.h)/(r.base.w*r.base.h)*100).toFixed(1)+'%';
-    var txt=['DCI '+r.resKey.toUpperCase()+' Layout','Full frame : '+r.base.w+' x '+r.base.h,'Container  : '+r.cont.w+' x '+r.cont.h,'Active     : '+r.fit.w+' x '+r.fit.h,'Bar type   : '+r.fit.barType,'Bar size   : '+r.fit.barPx+' px each side','Cont fill  : '+cf+'%'+fl,'Coords     : '+coords.x0+','+coords.y0+' -> '+coords.x1+','+coords.y1,'Ratio      : '+r.ratioVal.toFixed(4)].join('\n');
+    var txt=[
+      'DCI '+r.resKey.toUpperCase()+' Layout',
+      'Full frame : '+r.base.w+' x '+r.base.h,
+      'Container  : '+r.cont.w+' x '+r.cont.h,
+      'Active     : '+r.fit.w+' x '+r.fit.h,
+      'Bar type   : '+r.fit.barType,
+      'Bar size   : '+r.fit.barPx+' px each side',
+      'Cont fill  : '+cf2+'%'+fl,
+      'Coords     : '+coords.x0+','+coords.y0+' -> '+coords.x1+','+coords.y1,
+      'Ratio      : '+r.ratioVal.toFixed(4),
+    ].join('\n');
     navigator.clipboard.writeText(txt).then(function(){toast('Stats copied!');}).catch(function(){toast('Copy failed');});
   }
 });
@@ -423,14 +548,16 @@ function activateTab(name){
   document.querySelectorAll('.tb').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===name);});
   document.querySelectorAll('.tp').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+name);});
 }
-document.querySelectorAll('.tb').forEach(function(b){b.addEventListener('click',function(){activateTab(b.getAttribute('data-tab'));});});
+document.querySelectorAll('.tb').forEach(function(b){
+  b.addEventListener('click',function(){activateTab(b.getAttribute('data-tab'));});
+});
 
 document.getElementById('themeBtn').addEventListener('click',function(){
   document.body.classList.toggle('light');var l=document.body.classList.contains('light');
-  this.textContent=l?'☀️':'🌙';try{localStorage.setItem('dci_theme',l?'light':'dark');}catch(e){}
+  this.textContent=l?'☀️':'🌙';
+  try{localStorage.setItem('dci_theme',l?'light':'dark');}catch(e){}
   redrawAll();
 });
-
 document.getElementById('shareBtn').addEventListener('click',function(){
   if(navigator.share){navigator.share({title:'DCI Calc',url:window.location.href}).catch(function(){});}
   else{navigator.clipboard.writeText(window.location.href).then(function(){toast('URL copied!');}).catch(function(){toast('Copy failed');});}
@@ -456,7 +583,10 @@ document.getElementById('shareBtn').addEventListener('click',function(){
     ibtn.addEventListener('click',function(){
       if(!state.deferredPWA)return;
       state.deferredPWA.prompt();
-      state.deferredPWA.userChoice.then(function(res){state.deferredPWA=null;bar.classList.remove('show');if(res.outcome==='accepted')toast('App installed! ✅');});
+      state.deferredPWA.userChoice.then(function(res){
+        state.deferredPWA=null;bar.classList.remove('show');
+        if(res.outcome==='accepted')toast('App installed! ✅');
+      });
     });
     dis.addEventListener('click',function(){bar.classList.remove('show');try{localStorage.setItem('install-dismissed','1');}catch(e){}});
     window.addEventListener('appinstalled',function(){bar.classList.remove('show');toast('App installed! ✅');});
