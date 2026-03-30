@@ -1,4 +1,4 @@
-var CACHE = 'dci-calc-v6';
+var CACHE = 'dci-calc-v7';
 var FILES = [
   './index.html',
   './manifest.json',
@@ -6,7 +6,6 @@ var FILES = [
   './icon-512.png',
 ];
 
-/* Install — cache all files */
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
@@ -16,7 +15,6 @@ self.addEventListener('install', function(e) {
   self.skipWaiting();
 });
 
-/* Activate — delete old caches */
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
@@ -29,8 +27,18 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-/* Fetch — serve from cache, fall back to network */
 self.addEventListener('fetch', function(e) {
+  /* ✅ For navigation requests (opening the app), always serve index.html */
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      caches.match('./index.html').then(function(cached) {
+        return cached || fetch('./index.html');
+      })
+    );
+    return;
+  }
+
+  /* For all other requests, cache first then network */
   e.respondWith(
     caches.match(e.request).then(function(cached) {
       return cached || fetch(e.request);
