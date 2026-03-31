@@ -68,6 +68,7 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
 #idismiss{background:none!important;color:var(--fg)!important;opacity:.5;font-weight:normal!important}
 #test-preview-wrap{margin:.75em 0;text-align:center}
 #test-preview-wrap canvas{max-width:100%;border:1px solid var(--bdr);border-radius:4px;cursor:zoom-in}
+#test-info{font-size:.82em;opacity:.65;margin-bottom:.5em;padding:.4em .6em;background:var(--inp);border-radius:4px;border:1px solid var(--bdr)}
 
 /* ── Desktop layout ── */
 @media(min-width:900px){
@@ -101,7 +102,7 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
   hr{margin:.35em 0}
   .solo-card .stats-col{flex:0 0 240px}
   #pane-reverse .card{max-width:600px}
-  #pane-test .card{max-width:800px}
+  #pane-test .card{max-width:900px}
 }
 </style>
 </head>
@@ -124,7 +125,6 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
 </div>
 
 <div id="main">
-
   <div id="settings-strip">
     <div class="card">
       <div class="cg">
@@ -170,14 +170,8 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
           Enter your active frame dimensions to find the aspect ratio and bar sizes.
         </p>
         <div class="rev-grid">
-          <label class="cl">Width (px)
-            <input type="text" id="rev-w" placeholder="e.g. 1998"
-                   autocomplete="off" inputmode="numeric">
-          </label>
-          <label class="cl">Height (px)
-            <input type="text" id="rev-h" placeholder="e.g. 1080"
-                   autocomplete="off" inputmode="numeric">
-          </label>
+          <label class="cl">Width (px)<input type="text" id="rev-w" placeholder="e.g. 1998" autocomplete="off" inputmode="numeric"></label>
+          <label class="cl">Height (px)<input type="text" id="rev-h" placeholder="e.g. 1080" autocomplete="off" inputmode="numeric"></label>
         </div>
         <div id="rev-out"></div>
       </div>
@@ -186,10 +180,12 @@ hr{border:none;border-top:1px solid var(--bdr);margin:.7em 0}
     <div class="tp" id="pane-test">
       <div class="card">
         <div class="ct">Test Picture Generator</div>
-        <p style="font-size:.83em;opacity:.6;margin-bottom:.75em">
-          Generates a full-resolution DCI test chart showing flat and scope container
-          boundaries, colour bars, grayscale ramps, focus targets and centre circle.
+        <p style="font-size:.83em;opacity:.6;margin-bottom:.5em">
+          Generates a full-resolution DCI test chart based on the current aspect ratio,
+          container and resolution settings. Includes colour bars, grayscale ramps,
+          focus targets, centre circle and container boundary markers.
         </p>
+        <div id="test-info"></div>
         <div id="test-preview-wrap">
           <canvas id="test-preview"></canvas>
         </div>
@@ -250,6 +246,23 @@ function activeCoords(r){
   var cox=Math.round((r.base.w-r.cont.w)/2),coy=Math.round((r.base.h-r.cont.h)/2);
   var x0=cox+Math.round((r.cont.w-r.fit.w)/2),y0=coy+Math.round((r.cont.h-r.fit.h)/2);
   return{x0:x0,y0:y0,x1:x0+r.fit.w-1,y1:y0+r.fit.h-1};
+}
+
+/* compute a result object for given rk using current UI settings */
+function computeResult(rk){
+  var raw=document.getElementById('ratio').value;
+  var rv=parseRatio(raw);if(!rv)return null;
+  var fmt=document.getElementById('container').value;
+  var base=RES[rk],cont=getContainer(fmt,rk);
+  var fit=getFit(cont.w,cont.h,rv);
+  var known=findKnownArea(rv,rk);
+  if(known&&known.w<=cont.w&&known.h<=cont.h){
+    fit.w=known.w;fit.h=known.h;
+    if(cont.w>fit.w){fit.barType='pillarbox';fit.barPx=Math.round((cont.w-fit.w)/2);}
+    else if(cont.h>fit.h){fit.barType='letterbox';fit.barPx=Math.round((cont.h-fit.h)/2);}
+    else{fit.barType='letterbox';fit.barPx=0;}
+  }
+  return{resKey:rk,base:base,cont:cont,fit:fit,fmt:fmt,ratioVal:rv};
 }
 
 /* ── Layout canvas ── */
@@ -370,15 +383,11 @@ function buildReverse(){
   ['2k','4k'].forEach(function(rk){
     var base=RES[rk],cont=getContainer(fmt,rk),fit=getFit(cont.w,cont.h,ratio);
     var cF=((wVal*hVal)/(cont.w*cont.h)*100).toFixed(1),fF=((wVal*hVal)/(base.w*base.h)*100).toFixed(1);
-    var fs=fmt!=='full'?cF+'% cont / '+fF+'% full':cF+'%';
-    rows+='<div class="rr"><strong>'+rk.toUpperCase()+'</strong> '+cont.w+'&times;'+cont.h+' &rarr; '+fit.barPx+'px '+fit.barType+' — '+fs+'</div>';
+    var fs2=fmt!=='full'?cF+'% cont / '+fF+'% full':cF+'%';
+    rows+='<div class="rr"><strong>'+rk.toUpperCase()+'</strong> '+cont.w+'&times;'+cont.h+' &rarr; '+fit.barPx+'px '+fit.barType+' — '+fs2+'</div>';
   });
   var frac=(wVal/g)<=100?(wVal/g)+':'+(hVal/g)+' — ':'';
-  out.innerHTML='<div class="card" style="margin-top:.75em">'+
-    '<span class="br">'+ratio.toFixed(4)+':1</span>'+
-    '<div style="opacity:.6;font-size:.83em;margin-bottom:.75em">'+frac+wVal+'&times;'+hVal+' px</div>'+
-    rows+
-    '<div class="ar" style="margin-top:.75em"><button class="ab p" id="urb">Use this ratio &rarr;</button></div></div>';
+  out.innerHTML='<div class="card" style="margin-top:.75em"><span class="br">'+ratio.toFixed(4)+':1</span><div style="opacity:.6;font-size:.83em;margin-bottom:.75em">'+frac+wVal+'&times;'+hVal+' px</div>'+rows+'<div class="ar" style="margin-top:.75em"><button class="ab p" id="urb">Use this ratio &rarr;</button></div></div>';
   document.getElementById('urb').onclick=function(){document.getElementById('ratio').value=ratio.toFixed(4);runCalc();activateTab('layout');};
 }
 
@@ -391,7 +400,7 @@ function runCalc(){
   try{localStorage.setItem('dci_ratio',raw);localStorage.setItem('dci_fmt',fmt);localStorage.setItem('dci_res',rp);}catch(e){}
   try{history.replaceState(null,'','#r='+encodeURIComponent(raw)+'&f='+fmt+'&res='+rp);}catch(e){}
   document.querySelectorAll('.pb').forEach(function(b){b.classList.toggle('active',rv!==null&&Math.abs(parseFloat(b.dataset.v)-rv)<0.0001);});
-  if(!rv){state.results=[];buildLayout();return;}
+  if(!rv){state.results=[];buildLayout();updateTestInfo();return;}
   var keys=rp==='both'?['2k','4k']:rp==='2k'?['2k']:['4k'];
   state.results=keys.map(function(rk){
     var base=RES[rk],cont=getContainer(fmt,rk),fit=getFit(cont.w,cont.h,rv);
@@ -405,6 +414,16 @@ function runCalc(){
     return{resKey:rk,base:base,cont:cont,fit:fit,fmt:fmt,ratioVal:rv};
   });
   buildLayout();
+  updateTestInfo();
+}
+
+/* update the test tab info line to reflect current settings */
+function updateTestInfo(){
+  var el=document.getElementById('test-info');if(!el)return;
+  if(!state.results.length){el.textContent='No valid ratio selected.';return;}
+  var r=state.results[0];
+  var parts=state.results.map(function(r2){return r2.base.label+': '+r2.fit.w+'×'+r2.fit.h;});
+  el.textContent='Current: '+r.ratioVal.toFixed(4)+':1 — '+r.fmt.toUpperCase()+' container — '+parts.join('  |  ');
 }
 
 /* ── Redraw ── */
@@ -423,8 +442,7 @@ function openModal(idx){
   var r=state.results[idx];if(!r)return;
   document.getElementById('modal').classList.add('open');document.body.style.overflow='hidden';
   var vw=Math.min(window.innerWidth-32,1400),vh=Math.min(window.innerHeight-32,900);
-  var asp=r.base.w/r.base.h,mw=vw,mh=vw/asp;
-  if(mh>vh){mh=vh;mw=vh*asp;}
+  var asp=r.base.w/r.base.h,mw=vw,mh=vw/asp;if(mh>vh){mh=vh;mw=vh*asp;}
   try{drawResult(document.getElementById('mc'),r,Math.floor(mw));}catch(e){}
 }
 document.getElementById('modal').addEventListener('click',function(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';});
@@ -436,7 +454,7 @@ function toast(msg){
   clearTimeout(state.toastTimer);state.toastTimer=setTimeout(function(){el.classList.remove('show');},2200);
 }
 
-/* ── Layout event delegation ── */
+/* ── Event delegation ── */
 document.getElementById('layout-out').addEventListener('click',function(e){
   var btn=e.target.closest('button');if(!btn)return;
   var idx=parseInt(btn.getAttribute('data-dl')!==null?btn.getAttribute('data-dl'):btn.getAttribute('data-cpstats'),10);
@@ -509,7 +527,6 @@ document.getElementById('shareBtn').addEventListener('click',function(){
   });
 }());
 
-/* ── Inputs ── */
 function debounce(fn,ms){var t;return function(){clearTimeout(t);t=setTimeout(fn,ms);};}
 document.getElementById('ratio').addEventListener('input',debounce(runCalc,280));
 document.getElementById('container').addEventListener('change',runCalc);
@@ -520,6 +537,11 @@ document.getElementById('rev-h').addEventListener('input',debounce(buildReverse,
 
 /* ════════════════════════════════════
    TEST PICTURE GENERATOR
+   drawTestPicture(canvas, r)
+   r = result object from state.results
+   All elements positioned from the actual
+   active area coords — reflects current
+   aspect ratio, container and resolution.
 ════════════════════════════════════ */
 function drawFocusTarget(ctx,cx,cy,sz){
   var h=sz*0.5,lw=Math.max(1,sz/40),as=sz*0.2,tSz=Math.max(6,sz*0.17);
@@ -533,88 +555,105 @@ function drawFocusTarget(ctx,cx,cy,sz){
     ctx.closePath();ctx.fill();
   }
   tri(cx,cy-h,'u');tri(cx,cy+h,'d');tri(cx-h,cy,'l');tri(cx+h,cy,'r');
-  ctx.fillStyle='#000000';ctx.fillRect(cx-h,cy-h,sz,sz);
+  ctx.fillStyle='#000';ctx.fillRect(cx-h,cy-h,sz,sz);
   ctx.strokeStyle='#00cc00';ctx.lineWidth=lw;ctx.strokeRect(cx-h,cy-h,sz,sz);
   var cols=8,cw2=sz/cols;
-  for(var r=0;r<cols;r++){for(var c=0;c<cols;c++){if((r+c)%2===0){ctx.fillStyle='#ffffff';ctx.fillRect(cx-h+c*cw2,cy-h+r*cw2,cw2,cw2);}}}
-  ctx.strokeStyle='#ff0000';ctx.lineWidth=lw*1.5;
+  for(var r=0;r<cols;r++){for(var c=0;c<cols;c++){if((r+c)%2===0){ctx.fillStyle='#fff';ctx.fillRect(cx-h+c*cw2,cy-h+r*cw2,cw2,cw2);}}}
+  ctx.strokeStyle='#f00';ctx.lineWidth=lw*1.5;
   ctx.beginPath();ctx.moveTo(cx-h,cy);ctx.lineTo(cx+h,cy);ctx.moveTo(cx,cy-h);ctx.lineTo(cx,cy+h);ctx.stroke();
-  ctx.fillStyle='#ff0000';ctx.beginPath();ctx.arc(cx,cy,lw*2,0,Math.PI*2);ctx.fill();
-  ctx.font='bold '+tSz+'px Arial';ctx.fillStyle='#00ff00';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(cx,cy,lw*2,0,Math.PI*2);ctx.fill();
+  ctx.font='bold '+tSz+'px Arial';ctx.fillStyle='#0f0';ctx.textAlign='center';ctx.textBaseline='top';
   ctx.fillText('123456789',cx,cy+h+as*0.3);
 }
 
-function drawTestPicture(canvas,rk){
-  var base=RES[rk],W=base.w,H=base.h;
+function drawTestPicture(canvas,r){
+  var W=r.base.w,H=r.base.h;
   canvas.width=W;canvas.height=H;
   var ctx=canvas.getContext('2d');
-  var flatC=CONTAINERS['flat'][rk],scopeC=CONTAINERS['scope'][rk];
-  var fX=Math.round((W-flatC.w)/2),sY=Math.round((H-scopeC.h)/2);
-  var cx=W/2,cy=H/2,lw=Math.max(2,W/1000),fs=Math.round(H*0.023);
-  var aX=fX,aY=sY,aW=flatC.w,aH=scopeC.h;
 
-  /* black background */
-  ctx.fillStyle='#000000';ctx.fillRect(0,0,W,H);
+  /* coordinates of active area in full-frame space */
+  var coords=activeCoords(r);
+  var aX=coords.x0,aY=coords.y0,aW=r.fit.w,aH=r.fit.h;
+  var cx=aX+aW/2,cy=aY+aH/2;   /* centre of active area */
 
-  /* faint crosshair */
-  ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=lw*0.5;
+  /* container offset */
+  var coX=Math.round((W-r.cont.w)/2),coY=Math.round((H-r.cont.h)/2);
+
+  var lw=Math.max(2,W/1000),fs=Math.round(H*0.023);
+
+  /* 1 — black background */
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+
+  /* 2 — faint crosshairs through active centre */
+  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=lw*0.5;
   ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();
   ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
 
-  /* white circle */
-  var circR=Math.round(scopeC.h*0.47);
-  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(cx,cy,circR,0,Math.PI*2);ctx.fill();
+  /* 3 — white circle inscribed in active area height */
+  var circR=Math.round(aH*0.47);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx,cy,circR,0,Math.PI*2);ctx.fill();
 
-  /* RGB colour bars left */
-  var cbW=Math.round(aW*0.055),cbH=Math.round(aH*0.36),cbY=aY+Math.round(aH*0.07),cbXL=aX+Math.round(aW*0.065);
-  ['#ff0000','#00ff00','#0000ff'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXL+i*cbW,cbY,cbW,cbH);});
+  /* 4 — RGB colour bars (left side of active area) */
+  var cbW=Math.round(aW*0.055),cbH=Math.round(aH*0.36);
+  var cbY=aY+Math.round(aH*0.07),cbXL=aX+Math.round(aW*0.065);
+  ['#f00','#0f0','#00f'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXL+i*cbW,cbY,cbW,cbH);});
 
-  /* CMY colour bars right */
+  /* 5 — CMY colour bars (right side) */
   var cbXR=aX+aW-Math.round(aW*0.065)-cbW*3;
-  ['#ffff00','#ff00ff','#00ffff'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXR+i*cbW,cbY,cbW,cbH);});
+  ['#ff0','#f0f','#0ff'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXR+i*cbW,cbY,cbW,cbH);});
 
-  /* grayscale ramps */
+  /* 6 — grayscale ramps */
   var grW=Math.round(aW*0.26),grH=Math.round(aH*0.10);
   var grXL=aX+Math.round(aW*0.065),grXR=aX+aW-Math.round(aW*0.065)-grW;
   var grY1=aY+Math.round(aH*0.53),grY2=aY+Math.round(aH*0.64);
-  function ramp(x,y,w,h,ltod){var g=ctx.createLinearGradient(x,y,x+w,y);g.addColorStop(0,ltod?'#ffffff':'#000000');g.addColorStop(1,ltod?'#000000':'#ffffff');ctx.fillStyle=g;ctx.fillRect(x,y,w,h);}
+  function ramp(x,y,w,h,ltd){var g=ctx.createLinearGradient(x,y,x+w,y);g.addColorStop(0,ltd?'#fff':'#000');g.addColorStop(1,ltd?'#000':'#fff');ctx.fillStyle=g;ctx.fillRect(x,y,w,h);}
   ramp(grXL,grY1,grW,grH,true);ramp(grXL,grY2,grW,grH,false);
   ramp(grXR,grY1,grW,grH,true);ramp(grXR,grY2,grW,grH,false);
 
-  /* brand boxes */
+  /* 7 — brand boxes */
   var bdW=Math.round(aW*0.075),bdH=Math.round(aH*0.065),bdY=Math.round(cy-bdH/2),bdFs=Math.round(bdH*0.38);
-  function brandBox(x,bgCol,txtCol){
-    ctx.fillStyle=bgCol;ctx.fillRect(x,bdY,bdW,bdH);
-    ctx.fillStyle=txtCol;ctx.font='bold '+bdFs+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  function brand(x,bg,fg){
+    ctx.fillStyle=bg;ctx.fillRect(x,bdY,bdW,bdH);
+    ctx.fillStyle=fg;ctx.font='bold '+bdFs+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText('DCI',x+bdW/2,bdY+bdH*0.3);ctx.fillText('Calc',x+bdW/2,bdY+bdH*0.72);
   }
-  brandBox(aX+Math.round(aW*0.008),'#cc0000','#ffffff');
-  brandBox(aX+aW-Math.round(aW*0.008)-bdW,'#ffffff','#cc0000');
+  brand(aX+Math.round(aW*0.008),'#c00','#fff');
+  brand(aX+aW-Math.round(aW*0.008)-bdW,'#fff','#c00');
 
-  /* corner focus targets */
-  var tSz=Math.round(W*0.062),tPad=tSz*0.58;
-  drawFocusTarget(ctx,aX+tPad,     aY+tPad,    tSz);
-  drawFocusTarget(ctx,aX+aW-tPad,  aY+tPad,    tSz);
-  drawFocusTarget(ctx,aX+tPad,     aY+aH-tPad, tSz);
-  drawFocusTarget(ctx,aX+aW-tPad,  aY+aH-tPad, tSz);
+  /* 8 — corner focus targets */
+  var tSz=Math.round(W*0.055),tPad=tSz*0.6;
+  drawFocusTarget(ctx,aX+tPad,   aY+tPad,   tSz);
+  drawFocusTarget(ctx,aX+aW-tPad,aY+tPad,   tSz);
+  drawFocusTarget(ctx,aX+tPad,   aY+aH-tPad,tSz);
+  drawFocusTarget(ctx,aX+aW-tPad,aY+aH-tPad,tSz);
 
-  /* centre focus targets */
-  var cTsz=Math.round(tSz*0.62);
-  drawFocusTarget(ctx,cx-circR*0.33,cy,cTsz);
-  drawFocusTarget(ctx,cx+circR*0.33,cy,cTsz);
+  /* 9 — centre focus targets inside circle */
+  var cTsz=Math.round(tSz*0.65);
+  drawFocusTarget(ctx,cx-circR*0.32,cy,cTsz);
+  drawFocusTarget(ctx,cx+circR*0.32,cy,cTsz);
 
-  /* flat lines (green vertical) */
-  ctx.strokeStyle='#00ff00';ctx.lineWidth=lw;
-  ctx.beginPath();ctx.moveTo(fX,0);ctx.lineTo(fX,H);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(W-fX,0);ctx.lineTo(W-fX,H);ctx.stroke();
+  /* 10 — container boundary lines */
+  /* flat = narrower than full frame → green vertical lines */
+  if(r.cont.w<W){
+    ctx.strokeStyle='#0f0';ctx.lineWidth=lw;
+    ctx.beginPath();ctx.moveTo(coX,0);ctx.lineTo(coX,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(W-coX,0);ctx.lineTo(W-coX,H);ctx.stroke();
+  }
+  /* scope = shorter than full frame → red horizontal lines */
+  if(r.cont.h<H){
+    ctx.strokeStyle='#f00';ctx.lineWidth=lw;
+    ctx.beginPath();ctx.moveTo(0,coY);ctx.lineTo(W,coY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,H-coY);ctx.lineTo(W,H-coY);ctx.stroke();
+  }
 
-  /* scope lines (red horizontal) */
-  ctx.strokeStyle='#ff0000';ctx.lineWidth=lw;
-  ctx.beginPath();ctx.moveTo(0,sY);ctx.lineTo(W,sY);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(0,H-sY);ctx.lineTo(W,H-sY);ctx.stroke();
+  /* 11 — active area boundary when it differs from container */
+  if(aW<r.cont.w||aH<r.cont.h){
+    ctx.save();ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=lw;
+    ctx.setLineDash([lw*5,lw*3]);ctx.strokeRect(aX,aY,aW,aH);ctx.restore();
+  }
 
-  /* boundary arrows */
-  var as2=Math.round(H*0.028);
+  /* 12 — boundary arrows */
+  var as2=Math.round(H*0.025);
   function arrow(ax,ay,dir,col){
     ctx.fillStyle=col;ctx.beginPath();
     if(dir==='u'){ctx.moveTo(ax,ay-as2);ctx.lineTo(ax-as2*.6,ay);ctx.lineTo(ax+as2*.6,ay);}
@@ -623,45 +662,74 @@ function drawTestPicture(canvas,rk){
     if(dir==='r'){ctx.moveTo(ax+as2,ay);ctx.lineTo(ax,ay-as2*.6);ctx.lineTo(ax,ay+as2*.6);}
     ctx.closePath();ctx.fill();
   }
-  [cy,aY+aH*0.25,aY+aH*0.75].forEach(function(y2){arrow(fX,y2,'l','#00ff00');arrow(W-fX,y2,'r','#00ff00');});
-  [cx,aX+aW*0.25,aX+aW*0.75].forEach(function(x2){arrow(x2,sY,'u','#ff0000');arrow(x2,H-sY,'d','#ff0000');});
+  if(r.cont.w<W){
+    [cy,aY+aH*0.25,aY+aH*0.75].forEach(function(y2){arrow(coX,y2,'l','#0f0');arrow(W-coX,y2,'r','#0f0');});
+  }
+  if(r.cont.h<H){
+    [cx,aX+aW*0.25,aX+aW*0.75].forEach(function(x2){arrow(x2,coY,'u','#f00');arrow(x2,H-coY,'d','#f00');});
+  }
 
-  /* dimension labels */
+  /* 13 — labels */
   ctx.font='bold '+fs+'px Arial';
-  ctx.fillStyle='#00ff00';
-  ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillText(flatC.w+' x '+flatC.h+'  FLAT',cx+fs,fs*0.5);
-  ctx.textAlign='right';ctx.textBaseline='bottom';
-  ctx.fillText('FLAT  '+flatC.w+' x '+flatC.h,cx-fs,H-fs*0.5);
-  ctx.fillStyle='#ff0000';
-  ctx.textAlign='left';ctx.textBaseline='top';
-  ctx.fillText(scopeC.w+' x '+scopeC.h+'  SCOPE',cx+fs,sY+fs*0.3);
-  ctx.textAlign='right';ctx.textBaseline='bottom';
-  ctx.fillText('SCOPE  '+scopeC.w+' x '+scopeC.h,cx-fs,H-sY-fs*0.3);
+
+  /* active area label — centred above active area */
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.fillText(aW+' \u00D7 '+aH+'   '+r.ratioVal.toFixed(4)+':1',cx,aY-Math.round(fs*0.4));
+
+  /* container label */
+  if(r.cont.w<W){
+    var cl1=r.cont.w+' \u00D7 '+r.cont.h+'  FLAT';
+    ctx.fillStyle='#0f0';ctx.textAlign='right';ctx.textBaseline='top';
+    ctx.fillText(cl1,coX-fs*0.5,fs*0.5);
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText(cl1,W-coX+fs*0.5,H-fs*0.5);
+  }
+  if(r.cont.h<H){
+    var cl2=r.cont.w+' \u00D7 '+r.cont.h+'  SCOPE';
+    ctx.fillStyle='#f00';ctx.textAlign='right';ctx.textBaseline='top';
+    ctx.fillText(cl2,cx-fs*0.5,coY+fs*0.3);
+    ctx.textAlign='left';ctx.textBaseline='bottom';
+    ctx.fillText(cl2,cx+fs*0.5,H-coY-fs*0.3);
+  }
+
+  /* full frame label — top right corner, dim */
+  ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='bold '+Math.round(fs*0.7)+'px Arial';
+  ctx.textAlign='right';ctx.textBaseline='top';
+  ctx.fillText(W+' \u00D7 '+H,W-fs*0.5,fs*0.4);
 }
 
+/* ── Test Generate ── */
 var testState={lastRk:null,lastCanvas:null};
 
 function generateTest(rk){
+  /* get result from state, or compute from current UI settings */
+  var r=null;
+  for(var i=0;i<state.results.length;i++){if(state.results[i].resKey===rk){r=state.results[i];break;}}
+  if(!r){
+    r=computeResult(rk);
+    if(!r){toast('Please enter a valid aspect ratio first');return;}
+  }
+
   var prev=document.getElementById('test-preview');
   var dlBtn=document.getElementById('dl-test-btn');
-  var base=RES[rk];
   var wrapW=document.getElementById('test-preview-wrap').clientWidth||800;
-  var preW=Math.min(wrapW,base.w),preH=Math.round(preW*base.h/base.w);
+  var preW=Math.min(wrapW,800),preH=Math.round(preW*r.base.h/r.base.w);
   prev.style.width=preW+'px';prev.style.height=preH+'px';
 
+  /* draw at full DCI resolution */
   var full=document.createElement('canvas');
-  drawTestPicture(full,rk);
+  drawTestPicture(full,r);
 
+  /* scale to preview */
   prev.width=preW;prev.height=preH;
   prev.getContext('2d').drawImage(full,0,0,preW,preH);
 
+  /* click preview → fullscreen modal */
   prev.onclick=function(){
     var modal=document.getElementById('modal'),mc=document.getElementById('mc');
     modal.classList.add('open');document.body.style.overflow='hidden';
     var vw=Math.min(window.innerWidth-32,1400),vh=Math.min(window.innerHeight-32,900);
-    var asp=base.w/base.h,mw=vw,mh=vw/asp;
-    if(mh>vh){mh=vh;mw=vh*asp;}
+    var asp=r.base.w/r.base.h,mw=vw,mh=vw/asp;if(mh>vh){mh=vh;mw=vh*asp;}
     mc.style.width=Math.floor(mw)+'px';mc.style.height=Math.floor(mh)+'px';
     mc.width=Math.floor(mw);mc.height=Math.floor(mh);
     mc.getContext('2d').drawImage(full,0,0,Math.floor(mw),Math.floor(mh));
@@ -669,7 +737,7 @@ function generateTest(rk){
 
   testState.lastRk=rk;testState.lastCanvas=full;
   dlBtn.style.display='';
-  dlBtn.textContent='⬇️ Download '+rk.toUpperCase()+' PNG ('+base.w+'×'+base.h+')';
+  dlBtn.textContent='⬇️ Download '+rk.toUpperCase()+' PNG ('+r.base.w+'×'+r.base.h+')';
   toast('Test picture generated — '+rk.toUpperCase());
 }
 
