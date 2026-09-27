@@ -1,4 +1,4 @@
-var CACHE = 'dci-calc-v11';
+var CACHE = 'dci-calc-v12';
 var FILES = [
   './index.html',
   './manifest.json',
