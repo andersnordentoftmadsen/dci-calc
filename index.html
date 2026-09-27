@@ -202,8 +202,9 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rtable td:first-child{font-family:var(--sans);font-weight:600}
 
 /* ── Screen ─────────────────────────────────────────── */
-.scr-controls{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:.9rem;margin-bottom:1rem;align-items:end}
-@media(max-width:720px){.scr-controls{grid-template-columns:1fr 1fr}.scr-controls>div:first-child{grid-column:1/-1}}
+.scr-controls{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.8fr) minmax(0,.8fr) minmax(0,1.1fr);gap:.9rem;margin-bottom:1rem;align-items:end}
+@media(max-width:900px){.scr-controls{grid-template-columns:1fr 1fr}.scr-controls>div:first-child,.scr-controls>div:last-child{grid-column:1/-1}}
+.hero.loss strong{color:var(--warn)}.hero.keep strong{color:var(--ok)}
 .scr-controls .text-in:disabled{opacity:.45}
 .scr-wrap{margin-bottom:1rem}
 .scr-wrap canvas{display:block;width:100%;height:auto;cursor:default}
@@ -329,7 +330,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
     <section class="pane" id="pane-screen">
       <div class="panel pad">
-        <p class="pane-intro">See how the current format fills a cinema screen. The picture is scaled as large as the screen allows, the way a projector with lens memory and masking presents it.</p>
+        <p class="pane-intro">See how the current format fills a cinema screen. With a motorised lens each format is zoomed to the screen at full resolution. With a fixed lens (e.g. a broken zoom motor) the lens stays in one position and the other formats are scaled electronically, which costs resolution.</p>
         <div class="scr-controls">
           <div>
             <div class="field-label">Screen shape</div>
@@ -346,6 +347,13 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
           <div>
             <label class="field-label" for="scr-width">Width <span class="hint">metres, optional</span></label>
             <input class="text-in" type="text" id="scr-width" autocomplete="off" inputmode="decimal" placeholder="12">
+          </div>
+          <div>
+            <div class="field-label">Lens</div>
+            <div class="seg" id="seg-lens" role="group" aria-label="Lens">
+              <button data-v="motor"><b>Motorised</b><small>lens memory</small></button>
+              <button data-v="fixed"><b>Fixed</b><small>scaling</small></button>
+            </div>
           </div>
         </div>
         <div class="cwrap scr-wrap" id="scr-wrap"><canvas id="scr-cv" aria-label="Screen preview"></canvas></div>
@@ -888,7 +896,7 @@ function filmArtFor(R){for(var k in FILM_ART){if(Math.abs(parseFloat(k)-R)<0.005
    narrower than the screen → full height, unused left & right (constant height)
 ════════════════════════════════════ */
 var SCREEN_RATIOS={flat:1.85,scope:2.39};
-var scr={type:'scope',custom:'',width:''};
+var scr={type:'scope',custom:'',width:'',lens:'motor'};
 function parseMetres(v){var n=parseFloat(String(v).replace(',','.'));return n>0&&isFinite(n)?n:null;}
 function screenRatio(){return scr.type==='custom'?parseRatio(scr.custom):SCREEN_RATIOS[scr.type];}
 function screenFit(S,R){
@@ -903,12 +911,25 @@ function saveHash(){
   var h='#r='+encodeURIComponent(raw)+'&f='+state.fmt+'&res='+state.res+'&s='+scr.type;
   if(scr.type==='custom'&&scr.custom)h+='&sr='+encodeURIComponent(scr.custom);
   if(scr.width)h+='&sw='+encodeURIComponent(scr.width);
+  if(scr.lens==='fixed')h+='&lens=fixed';
   try{history.replaceState(null,'',h);}catch(e){}
-  try{localStorage.setItem('dci_scr',scr.type);localStorage.setItem('dci_scr_r',scr.custom);localStorage.setItem('dci_scr_w',scr.width);}catch(e){}
+  try{localStorage.setItem('dci_scr',scr.type);localStorage.setItem('dci_scr_r',scr.custom);localStorage.setItem('dci_scr_w',scr.width);localStorage.setItem('dci_lens',scr.lens);}catch(e){}
 }
 function currentRatio(){return parseRatio(document.getElementById('ratio').value);}
 
+/* Fixed lens: the lens is locked so the largest panel area with the screen's shape fills the screen
+   (e.g. 2048×858 on a scope screen, 1998×1080 on a flat screen). Every format must then be scaled
+   to fit inside that area. Returns native size, locked area, scaled size and the kept fraction. */
+function lockRegion(rk,S){var k=findKnownArea(S,rk);if(k)return{w:k.w,h:k.h};var b=RES[rk];return getFit(b.w,b.h,S);}
+function fixedLens(rk,R,S){
+  var nat=computeResult(rk,R,state.fmt).fit,P=lockRegion(rk,S),d=getFit(P.w,P.h,R);
+  var k=Math.min(d.w/nat.w,d.h/nat.h);
+  return{nat:nat,P:P,d:d,k:k,lin:Math.min(1,k),px:Math.min(1,(d.w*d.h)/(nat.w*nat.h))};
+}
+function pct(v){return (v*100).toFixed(v>=0.995?0:1)+'%';}
+
 function buildScreen(){
+  document.querySelectorAll('#seg-lens button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===scr.lens);});
   document.querySelectorAll('#seg-screen button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===scr.type);});
   var ri=document.getElementById('scr-ratio'),wi=document.getElementById('scr-width');
   ri.disabled=scr.type!=='custom';
@@ -936,16 +957,33 @@ function buildScreen(){
     '<div><small>Screen used</small><strong>'+fill.toFixed(1)+'%</strong><em>'+how+'</em></div></div>'+
     '<div class="note info" style="margin-top:.75rem">'+note+'</div>';
 
+  var fixed=scr.lens==='fixed';
+  if(fixed){
+    var keys=resKeys(),F0=fixedLens(keys[0],R,S),lost=F0.lin<0.995;
+    html+='<div class="scr-sub">Fixed lens · scaling</div>'+
+      '<p class="pane-intro" style="margin-bottom:.75rem">Lens locked so the '+F0.P.w+'×'+F0.P.h+' area ('+RES[keys[0]].label+') fills the '+S.toFixed(2)+':1 screen. '+R.toFixed(2)+':1 must be scaled from '+F0.nat.w+'×'+F0.nat.h+' to '+F0.d.w+'×'+F0.d.h+'.</p>'+
+      '<div class="hero '+(lost?'loss':'keep')+'">'+
+        '<div><small>Resolution kept</small><strong>'+pct(F0.lin)+'</strong><em>'+(lost?'lines and columns, each direction':'no scaling down needed')+'</em></div>'+
+        '<div><small>Pixels kept</small><strong>'+pct(F0.px)+'</strong><em>'+(lost?pct(1-F0.px)+' of the picture detail is lost':(F0.k>1.005?'upscaled '+((F0.k-1)*100).toFixed(1)+'%':'native'))+'</em></div>'+
+      '</div>';
+    html+='<table class="rtable" style="margin-top:.75rem"><thead><tr><th>Res</th><th>Native</th><th>Locked area</th><th>Scaled to</th><th>Kept</th></tr></thead><tbody>';
+    keys.forEach(function(rk){var F=fixedLens(rk,R,S);
+      html+='<tr><td>'+rk.toUpperCase()+'</td><td>'+F.nat.w+'×'+F.nat.h+'</td><td>'+F.P.w+'×'+F.P.h+'</td><td>'+F.d.w+'×'+F.d.h+'</td><td>'+pct(F.lin)+' · '+pct(F.px)+' px</td></tr>';});
+    html+='</tbody></table>';
+    if(lost)html+='<div class="note warn">Scaling down to '+pct(F0.lin)+' softens fine detail and small text (subtitles, credits). Formats that match the locked area play natively.</div>';
+  }
+
   /* comparison of all presets on this screen */
   var rows=PRESETS.map(function(p){return{v:parseFloat(p.v),n:p.n,txt:p.v};});
   if(!rows.some(function(x){return Math.abs(x.v-R)<0.0001;}))rows.push({v:R,n:'Current',txt:R.toFixed(2)});
   rows.sort(function(a,b){return a.v-b.v;});
-  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th><th class="hide-sm">Presentation</th></tr></thead><tbody>';
+  var rk0=resKeys()[0];
+  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen'+(fixed?' · fixed lens':'')+'</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th>'+(fixed?'<th>Res. kept</th>':'')+'<th class="hide-sm">Presentation</th></tr></thead><tbody>';
   rows.forEach(function(x){
     var g=screenFit(S,x.v),u=g.fw*g.fh*100,cur=Math.abs(x.v-R)<0.0001;
     var dims=Wm?fmtM(Wm*g.fw)+' × '+fmtM(Hm*g.fh):Math.round(g.fw*100)+'% × '+Math.round(g.fh*100)+'%';
     var pres={match:'Fills screen',width:'Constant width',height:'Constant height'}[g.mode];
-    html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td><td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
+    html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td>'+(fixed?(function(){var F=fixedLens(rk0,x.v,S);return '<td style="color:'+(F.lin<0.995?'var(--warn)':'var(--ok)')+'">'+pct(F.lin)+'</td>';}()):'')+'<td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
   });
   html+='</tbody></table>';
   out.innerHTML=html;
@@ -1030,6 +1068,7 @@ document.getElementById('seg-screen').addEventListener('click',function(e){
   saveHash();buildScreen();
   if(scr.type==='custom'){var ri=document.getElementById('scr-ratio');ri.focus();ri.select();}
 });
+document.getElementById('seg-lens').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;scr.lens=b.dataset.v;saveHash();buildScreen();});
 document.getElementById('scr-ratio').addEventListener('input',debounce(function(){scr.custom=document.getElementById('scr-ratio').value;saveHash();buildScreen();},200));
 document.getElementById('scr-width').addEventListener('input',debounce(function(){scr.width=document.getElementById('scr-width').value.trim();saveHash();buildScreen();},200));
 
@@ -1238,6 +1277,7 @@ document.getElementById('dl-test-btn').addEventListener('click',function(){
   var st=params.get('s')||ls('dci_scr');scr.type=(st==='flat'||st==='scope'||st==='custom')?st:'scope';
   scr.custom=params.get('sr')||ls('dci_scr_r')||'';
   scr.width=params.get('sw')||ls('dci_scr_w')||'';
+  scr.lens=(params.get('lens')||ls('dci_lens'))==='fixed'?'fixed':'motor';
   runCalc();
 }());
 
