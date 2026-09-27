@@ -922,9 +922,19 @@ function currentRatio(){return parseRatio(document.getElementById('ratio').value
    to fit inside that area. Returns native size, locked area, scaled size and the kept fraction. */
 function lockRegion(rk,S){var k=findKnownArea(S,rk);if(k)return{w:k.w,h:k.h};var b=RES[rk];return getFit(b.w,b.h,S);}
 function fixedLens(rk,R,S){
-  var nat=computeResult(rk,R,state.fmt).fit,P=lockRegion(rk,S),d=getFit(P.w,P.h,R);
-  var k=Math.min(d.w/nat.w,d.h/nat.h);
-  return{nat:nat,P:P,d:d,k:k,lin:Math.min(1,k),px:Math.min(1,(d.w*d.h)/(nat.w*nat.h))};
+  /* the server/projector scales the whole DCP container (bars included) into the locked area */
+  var res=computeResult(rk,R,state.fmt),C=res.cont,A=res.fit,P=lockRegion(rk,S);
+  var k=Math.min(1,P.w/C.w,P.h/C.h);
+  var cs={w:Math.round(C.w*k),h:Math.round(C.h*k)},as={w:Math.round(A.w*k),h:Math.round(A.h*k)};
+  /* alternative: crop to the active picture first, then scale */
+  var kc=Math.min(1,P.w/A.w,P.h/A.h);
+  return{C:C,A:A,P:P,k:k,lin:k,px:k*k,cs:cs,as:as,kc:kc,fw:Math.min(1,as.w/P.w),fh:Math.min(1,as.h/P.h)};
+}
+/* how much of the screen the picture covers, for the current lens mode */
+function pictureFit(S,R){
+  if(scr.lens!=='fixed')return screenFit(S,R);
+  var F=fixedLens(resKeys()[0],R,S),fw=F.fw,fh=F.fh,fw1=fw>0.995,fh1=fh>0.995;
+  return{fw:fw1?1:fw,fh:fh1?1:fh,mode:fw1&&fh1?'match':fw1?'width':fh1?'height':'both'};
 }
 function pct(v){return (v*100).toFixed(v>=0.995?0:1)+'%';}
 
@@ -942,15 +952,16 @@ function buildScreen(){
   var out=document.getElementById('scr-out'),S=screenRatio(),R=currentRatio(),Wm=parseMetres(scr.width);
   if(!S){out.innerHTML='<div class="note warn">Enter the screen ratio, e.g. 2.00, 16:9 or width x height like 12.5x5.2.</div>';drawScreenCanvas();return;}
   if(!R){out.innerHTML='<div class="note warn">Enter a valid aspect ratio in the settings to preview it.</div>';drawScreenCanvas();return;}
-  var f=screenFit(S,R),fill=(f.fw*f.fh*100);
+  var f=pictureFit(S,R),fill=(f.fw*f.fh*100);
   var Hm=Wm?Wm/S:null;
   var size=Wm?fmtM(Wm*f.fw)+' × '+fmtM(Hm*f.fh)+' m':Math.round(f.fw*100)+'% × '+Math.round(f.fh*100)+'%';
   var sizeSub=Wm?'Screen '+fmtM(Wm)+' × '+fmtM(Hm)+' m':'of screen width × height';
-  var how={match:'Fills the whole screen',width:'Full width · unused top & bottom',height:'Full height · unused left & right'}[f.mode];
+  var how={match:'Fills the whole screen',width:'Full width · unused top & bottom',height:'Full height · unused left & right',both:'Smaller than the screen on all sides'}[f.mode];
   var note={
     match:'The format matches the screen, so the picture fills it edge to edge.',
     width:'Constant width: the picture is wider than the screen, so it uses the full width and leaves '+(Wm?fmtM((Hm-Hm*f.fh)/2)+' m':Math.round((1-f.fh)*50)+'%')+' of screen unused above and below. Top/bottom masking closes this in.',
-    height:'Constant height: the picture is narrower than the screen, so it uses the full height and leaves '+(Wm?fmtM((Wm-Wm*f.fw)/2)+' m':Math.round((1-f.fw)*50)+'%')+' of screen unused on each side. Side masking closes this in.'
+    height:'Constant height: the picture is narrower than the screen, so it uses the full height and leaves '+(Wm?fmtM((Wm-Wm*f.fw)/2)+' m':Math.round((1-f.fw)*50)+'%')+' of screen unused on each side. Side masking closes this in.',
+    both:'Windowboxed: the whole DCP container is scaled down to fit the locked lens, so the bars inside the DCP shrink with it and the picture no longer reaches any edge of the screen.'
   }[f.mode];
   var html='<div class="hero">'+
     '<div><small>Picture on screen</small><strong>'+size+'</strong><em>'+sizeSub+'</em></div>'+
@@ -959,18 +970,22 @@ function buildScreen(){
 
   var fixed=scr.lens==='fixed';
   if(fixed){
-    var keys=resKeys(),F0=fixedLens(keys[0],R,S),lost=F0.lin<0.995;
+    var keys=resKeys(),F0=fixedLens(keys[0],R,S),lost=F0.lin<0.995,cn=FMT_NAME[state.fmt];
     html+='<div class="scr-sub">Fixed lens · scaling</div>'+
-      '<p class="pane-intro" style="margin-bottom:.75rem">Lens locked so the '+F0.P.w+'×'+F0.P.h+' area ('+RES[keys[0]].label+') fills the '+S.toFixed(2)+':1 screen. '+R.toFixed(2)+':1 must be scaled from '+F0.nat.w+'×'+F0.nat.h+' to '+F0.d.w+'×'+F0.d.h+'.</p>'+
+      '<p class="pane-intro" style="margin-bottom:.75rem">Lens locked so the '+F0.P.w+'×'+F0.P.h+' area ('+RES[keys[0]].label+') fills the '+S.toFixed(2)+':1 screen. '+
+      (lost?'The whole '+cn+' container ('+F0.C.w+'×'+F0.C.h+') is scaled to '+F0.cs.w+'×'+F0.cs.h+', so the '+R.toFixed(2)+':1 picture ('+F0.A.w+'×'+F0.A.h+') ends up as '+F0.as.w+'×'+F0.as.h+'.':
+        'The '+cn+' container ('+F0.C.w+'×'+F0.C.h+') fits the locked area without scaling, so it plays natively.')+'</p>'+
       '<div class="hero '+(lost?'loss':'keep')+'">'+
-        '<div><small>Resolution kept</small><strong>'+pct(F0.lin)+'</strong><em>'+(lost?'lines and columns, each direction':'no scaling down needed')+'</em></div>'+
-        '<div><small>Pixels kept</small><strong>'+pct(F0.px)+'</strong><em>'+(lost?pct(1-F0.px)+' of the picture detail is lost':(F0.k>1.005?'upscaled '+((F0.k-1)*100).toFixed(1)+'%':'native'))+'</em></div>'+
+        '<div><small>Resolution kept</small><strong>'+pct(F0.lin)+'</strong><em>'+(lost?'lines and columns, each direction':'no scaling')+'</em></div>'+
+        '<div><small>Pixels kept</small><strong>'+pct(F0.px)+'</strong><em>'+(lost?pct(1-F0.px)+' of the picture detail is lost':'native')+'</em></div>'+
       '</div>';
-    html+='<table class="rtable" style="margin-top:.75rem"><thead><tr><th>Res</th><th>Native</th><th>Locked area</th><th>Scaled to</th><th>Kept</th></tr></thead><tbody>';
+    html+='<table class="rtable" style="margin-top:.75rem"><thead><tr><th>Res</th><th>DCP container</th><th>Locked area</th><th>Container → </th><th>Picture →</th><th>Kept</th></tr></thead><tbody>';
     keys.forEach(function(rk){var F=fixedLens(rk,R,S);
-      html+='<tr><td>'+rk.toUpperCase()+'</td><td>'+F.nat.w+'×'+F.nat.h+'</td><td>'+F.P.w+'×'+F.P.h+'</td><td>'+F.d.w+'×'+F.d.h+'</td><td>'+pct(F.lin)+' · '+pct(F.px)+' px</td></tr>';});
+      html+='<tr><td>'+rk.toUpperCase()+'</td><td>'+F.C.w+'×'+F.C.h+'</td><td>'+F.P.w+'×'+F.P.h+'</td><td>'+F.cs.w+'×'+F.cs.h+'</td><td>'+F.as.w+'×'+F.as.h+'</td><td>'+pct(F.lin)+' · '+pct(F.px)+' px</td></tr>';});
     html+='</tbody></table>';
-    if(lost)html+='<div class="note warn">Scaling down to '+pct(F0.lin)+' softens fine detail and small text (subtitles, credits). Formats that match the locked area play natively.</div>';
+    if(lost)html+='<div class="note warn">Scaling down to '+pct(F0.lin)+' softens fine detail and small text (subtitles, credits). DCPs whose container matches the locked area play natively.</div>';
+    if(F0.kc>F0.k+0.004&&(F0.A.w!==F0.C.w||F0.A.h!==F0.C.h))
+      html+='<div class="note info" style="margin-top:.5rem">If the server or projector can crop to the active picture ('+F0.A.w+'×'+F0.A.h+') before scaling, you keep '+pct(F0.kc)+' instead and the picture fills the screen as with a motorised lens.</div>';
   }
 
   /* comparison of all presets on this screen */
@@ -978,11 +993,11 @@ function buildScreen(){
   if(!rows.some(function(x){return Math.abs(x.v-R)<0.0001;}))rows.push({v:R,n:'Current',txt:R.toFixed(2)});
   rows.sort(function(a,b){return a.v-b.v;});
   var rk0=resKeys()[0];
-  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen'+(fixed?' · fixed lens':'')+'</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th>'+(fixed?'<th>Res. kept</th>':'')+'<th class="hide-sm">Presentation</th></tr></thead><tbody>';
+  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen'+(fixed?' · fixed lens · '+FMT_NAME[state.fmt]+' DCPs':'')+'</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th>'+(fixed?'<th>Res. kept</th>':'')+'<th class="hide-sm">Presentation</th></tr></thead><tbody>';
   rows.forEach(function(x){
-    var g=screenFit(S,x.v),u=g.fw*g.fh*100,cur=Math.abs(x.v-R)<0.0001;
+    var g=pictureFit(S,x.v),u=g.fw*g.fh*100,cur=Math.abs(x.v-R)<0.0001;
     var dims=Wm?fmtM(Wm*g.fw)+' × '+fmtM(Hm*g.fh):Math.round(g.fw*100)+'% × '+Math.round(g.fh*100)+'%';
-    var pres={match:'Fills screen',width:'Constant width',height:'Constant height'}[g.mode];
+    var pres={match:'Fills screen',width:'Constant width',height:'Constant height',both:'Windowboxed'}[g.mode];
     html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td>'+(fixed?(function(){var F=fixedLens(rk0,x.v,S);return '<td style="color:'+(F.lin<0.995?'var(--warn)':'var(--ok)')+'">'+pct(F.lin)+'</td>';}()):'')+'<td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
   });
   html+='</tbody></table>';
@@ -1016,7 +1031,7 @@ function drawScreenCanvas(){
   ctx.fillStyle='#2c2f35';ctx.fillRect(sx,sy,sw,sh);
   ctx.fillStyle=hatch(ctx,'rgba(255,255,255,0.06)',Math.max(8,Math.round(cssW/70)));ctx.fillRect(sx,sy,sw,sh);
   if(R){
-    var f=screenFit(S,R),pw=sw*f.fw,ph=sh*f.fh,px=sx+(sw-pw)/2,py=sy+(sh-ph)/2;
+    var f=pictureFit(S,R),pw=sw*f.fw,ph=sh*f.fh,px=sx+(sw-pw)/2,py=sy+(sh-ph)/2;
     /* projected picture: film-inspired illustration when the format has one, else a simple horizon */
     var art=filmArtFor(R);
     ctx.save();ctx.beginPath();ctx.rect(px,py,pw,ph);ctx.clip();
