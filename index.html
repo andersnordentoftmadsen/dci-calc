@@ -313,7 +313,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 
     <section class="pane" id="pane-test">
       <div class="panel pad">
-        <p class="pane-intro">A full-resolution chart built from the current ratio and container: colour bars, grey ramps, focus targets, centre circle and container boundary markers.</p>
+        <p class="pane-intro">A full-resolution alignment chart in the classic Flat/Scope chart layout, marked up for the generated format: colour bars, grey ramps, focus targets, centre circle, edge arrows and size labels.</p>
         <div id="test-info"></div>
         <div id="test-preview-wrap"><canvas id="test-preview"></canvas></div>
         <div class="actions">
@@ -322,9 +322,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
           <button class="btn" id="dl-test-btn" style="display:none"></button>
         </div>
         <div class="legend">
-          <span><i style="background:#0f0"></i>Flat container edge</span>
-          <span><i style="background:#f00"></i>Scope container edge</span>
-          <span><i style="background:#fff;border:1px solid var(--border)"></i>Active area (dashed) when smaller than container</span>
+          <span><i style="background:#0f0"></i>Generated format</span>
+          <span><i style="background:#f00"></i>Container (shown when it differs from the format and the full frame)</span>
         </div>
       </div>
     </section>
@@ -684,133 +683,151 @@ document.getElementById('rev-h').addEventListener('input',debounce(buildReverse,
 }());
 
 /* ════════════════════════════════════
-   TEST PICTURE GENERATOR (chart content unchanged)
+   TEST PICTURE GENERATOR
+   Layout modelled on the classic Barco DCI Flat/Scope alignment chart.
+   Instead of the fixed Flat + Scope markings, the chart marks the
+   generated format (green) and, when it differs, the container (red).
+   Fixed content (bars, ramps, circle, centre targets) keeps the
+   reference proportions and shrinks uniformly only if the format is
+   too small to hold it.
 ════════════════════════════════════ */
-function drawFocusTarget(ctx,cx,cy,sz){
-  var h=sz*0.5,lw=Math.max(1,sz/40),as=sz*0.2,tSz=Math.max(6,sz*0.17);
-  ctx.fillStyle='#00ff00';
-  function tri(ax,ay,dir){
-    ctx.beginPath();
-    if(dir==='u'){ctx.moveTo(ax,ay-as);ctx.lineTo(ax-as*.5,ay);ctx.lineTo(ax+as*.5,ay);}
-    if(dir==='d'){ctx.moveTo(ax,ay+as);ctx.lineTo(ax-as*.5,ay);ctx.lineTo(ax+as*.5,ay);}
-    if(dir==='l'){ctx.moveTo(ax-as,ay);ctx.lineTo(ax,ay-as*.5);ctx.lineTo(ax,ay+as*.5);}
-    if(dir==='r'){ctx.moveTo(ax+as,ay);ctx.lineTo(ax,ay-as*.5);ctx.lineTo(ax,ay+as*.5);}
-    ctx.closePath();ctx.fill();
+var CHART_FONT='Tahoma, Verdana, "DejaVu Sans", Arial, sans-serif';
+
+/* focus target: top-left (x,y), size s. mono=false → green corner target, true → white centre target */
+function drawChartTarget(ctx,x,y,s,mono){
+  var fg=mono?'#fff':'#00ff00',ink='#000',notch=mono?'#7dff7d':'#00ff00';
+  var lw=Math.max(1,s*0.025),i=s*0.13;
+  /* corner notches sitting over the outer edge */
+  var n=s*0.1;ctx.fillStyle=notch;
+  [[x-n*0.3,y-n*0.3],[x+s-n*0.7,y-n*0.3],[x-n*0.3,y+s-n*0.7],[x+s-n*0.7,y+s-n*0.7]].forEach(function(p){ctx.fillRect(p[0],p[1],n,n);});
+  /* body */
+  ctx.fillStyle=fg;ctx.fillRect(x+n*0.3,y+n*0.3,s-n*0.6,s-n*0.6);
+  /* ruler ticks along the inner frame */
+  ctx.fillStyle=ink;
+  for(var k=1;k<8;k++){var t=x+s*k/8;ctx.fillRect(t-lw/2,y+i*0.55,lw,i*0.4);ctx.fillRect(t-lw/2,y+s-i*0.95,lw,i*0.4);
+    var u=y+s*k/8;ctx.fillRect(x+i*0.55,u-lw/2,i*0.4,lw);ctx.fillRect(x+s-i*0.95,u-lw/2,i*0.4,lw);}
+  ctx.strokeStyle=ink;ctx.lineWidth=lw*1.4;ctx.strokeRect(x+i,y+i,s-2*i,s-2*i);
+  /* rainbow resolution lines (centre targets) */
+  if(mono){
+    var cols=['#f00','#f80','#fd0','#0c0','#0cf','#00f','#a0f','#f0a'],gy=y+s*0.3,gh=s*0.4;
+    cols.forEach(function(c,j){ctx.fillStyle=c;var xx=x+i+(s-2*i)*(j+0.5)/cols.length;ctx.fillRect(xx-lw*0.4,gy,lw*0.8,gh);});
   }
-  tri(cx,cy-h,'u');tri(cx,cy+h,'d');tri(cx-h,cy,'l');tri(cx+h,cy,'r');
-  ctx.fillStyle='#000';ctx.fillRect(cx-h,cy-h,sz,sz);
-  ctx.strokeStyle='#00cc00';ctx.lineWidth=lw;ctx.strokeRect(cx-h,cy-h,sz,sz);
-  var cols=8,cw2=sz/cols;
-  for(var r=0;r<cols;r++){for(var c=0;c<cols;c++){if((r+c)%2===0){ctx.fillStyle='#fff';ctx.fillRect(cx-h+c*cw2,cy-h+r*cw2,cw2,cw2);}}}
-  ctx.strokeStyle='#f00';ctx.lineWidth=lw*1.5;
-  ctx.beginPath();ctx.moveTo(cx-h,cy);ctx.lineTo(cx+h,cy);ctx.moveTo(cx,cy-h);ctx.lineTo(cx,cy+h);ctx.stroke();
-  ctx.fillStyle='#f00';ctx.beginPath();ctx.arc(cx,cy,lw*2,0,Math.PI*2);ctx.fill();
-  ctx.font='bold '+tSz+'px Arial';ctx.fillStyle='#0f0';ctx.textAlign='center';ctx.textBaseline='top';
-  ctx.fillText('123456789',cx,cy+h+as*0.3);
+  /* centre ring with bar groups and FOCUS text */
+  var cx=x+s/2,cy=y+s/2,rr=s*0.22;
+  ctx.fillStyle=fg;ctx.beginPath();ctx.arc(cx,cy,rr,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=ink;ctx.lineWidth=lw;ctx.stroke();
+  ctx.fillStyle=ink;
+  for(var b=0;b<3;b++){ctx.fillRect(cx-rr*0.75+b*rr*0.2,cy-rr*0.45,rr*0.09,rr*0.6);ctx.fillRect(cx+rr*0.12,cy-rr*0.45+b*rr*0.2,rr*0.55,rr*0.09);}
+  ctx.font='bold '+(s*0.085)+'px '+CHART_FONT;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('FOCUS',cx,cy+rr*0.55);
+  /* up/down markers top corners, solid blocks bottom corners */
+  var m=s*0.1;
+  [[x+i+lw,y+i+lw],[x+s-i-lw-m,y+i+lw]].forEach(function(p){
+    ctx.fillStyle=ink;ctx.fillRect(p[0],p[1],m,m);ctx.fillStyle=fg;
+    ctx.beginPath();ctx.moveTo(p[0]+m/2,p[1]+m*0.12);ctx.lineTo(p[0]+m*0.8,p[1]+m*0.42);ctx.lineTo(p[0]+m*0.2,p[1]+m*0.42);ctx.fill();
+    ctx.beginPath();ctx.moveTo(p[0]+m/2,p[1]+m*0.88);ctx.lineTo(p[0]+m*0.8,p[1]+m*0.58);ctx.lineTo(p[0]+m*0.2,p[1]+m*0.58);ctx.fill();
+  });
+  ctx.fillStyle=ink;var q=s*0.14;
+  ctx.fillRect(x+i+lw,y+s-i-lw-q,q,q);ctx.fillRect(x+s-i-lw-q,y+s-i-lw-q,q,q);
+  /* 238 code in the top strip */
+  ctx.fillStyle=mono?'#7dff7d':'#000';ctx.font=(s*0.08)+'px '+CHART_FONT;ctx.textBaseline='middle';ctx.fillText('238',cx,y+i*0.35);
 }
 
 function drawTestPicture(canvas,r){
   var W=r.base.w,H=r.base.h;
   canvas.width=W;canvas.height=H;
   var ctx=canvas.getContext('2d');
-  var coords=activeCoords(r);
-  var aX=coords.x0,aY=coords.y0,aW=r.fit.w,aH=r.fit.h;
-  var cx=aX+aW/2,cy=aY+aH/2;
-  var coX=Math.round((W-r.cont.w)/2),coY=Math.round((H-r.cont.h)/2);
-  var lw=Math.max(2,W/1000),fs=Math.round(H*0.023);
+  var co=activeCoords(r);
+  var A={x:co.x0,y:co.y0,w:r.fit.w,h:r.fit.h};
+  var C={x:Math.round((W-r.cont.w)/2),y:Math.round((H-r.cont.h)/2),w:r.cont.w,h:r.cont.h};
+  var cx=A.x+A.w/2,cy=A.y+A.h/2;
+  var lw=Math.max(1,Math.round(W/2048)),fs=Math.round(H*0.0245);
+  var GREEN='#00ff00',RED='#ff0000';
 
+  /* 1 — background + grey centre crosshair */
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=lw*0.5;
-  ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
+  ctx.fillStyle='#8c8c8c';ctx.fillRect(0,Math.round(cy)-lw/2,W,lw);ctx.fillRect(Math.round(cx)-lw/2,0,lw,H);
 
-  var circR=Math.round(aH*0.47);
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx,cy,circR,0,Math.PI*2);ctx.fill();
+  /* 2 — fixed content, reference layout in full-frame units, scaled down only if it does not fit */
+  var k=Math.min(1,A.w/(W*0.976),A.h/(H*0.794));
+  ctx.save();ctx.translate(cx,cy);ctx.scale(k,k);ctx.translate(-W/2,-H/2);
+  var bx0=W*0.1465,bw=W*0.2135,by=H*0.2125,bh=H*0.2195,bx1=W-bx0-bw;
+  ['#f00','#0f0','#00f'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(bx0+i*bw/3,by,bw/3+0.5,bh);});
+  ['#ff0','#f0f','#0ff'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(bx1+i*bw/3,by,bw/3+0.5,bh);});
+  var ry1=H*0.5685,ry2=H*0.679,ry3=H*0.789;
+  function ramp(x,y,h,wToB){var g=ctx.createLinearGradient(x,0,x+bw,0);g.addColorStop(0,wToB?'#fff':'#000');g.addColorStop(1,wToB?'#000':'#fff');ctx.fillStyle=g;ctx.fillRect(x,y,bw,h);}
+  ramp(bx0,ry1,ry2-ry1,true);ramp(bx0,ry2,ry3-ry2,false);
+  ramp(bx1,ry1,ry2-ry1,true);ramp(bx1,ry2,ry3-ry2,false);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(W/2,H/2,H*0.261,0,Math.PI*2);ctx.fill();
+  var ts=W*0.047,tl=Math.round(ts*0.19);
+  [W/2-W*0.0855,W/2+W*0.0855].forEach(function(tx){
+    drawChartTarget(ctx,tx-ts/2,H/2-H*0.012-ts/2,ts,true);
+    ctx.fillStyle='#000';ctx.font='bold '+tl+'px '+CHART_FONT;ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText('123456789',tx,H/2-H*0.012+ts/2+ts*0.06,ts*1.02);
+  });
+  ctx.restore();
 
-  var cbW=Math.round(aW*0.055),cbH=Math.round(aH*0.36);
-  var cbY=aY+Math.round(aH*0.07),cbXL=aX+Math.round(aW*0.065);
-  ['#f00','#0f0','#00f'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXL+i*cbW,cbY,cbW,cbH);});
-  var cbXR=aX+aW-Math.round(aW*0.065)-cbW*3;
-  ['#ff0','#f0f','#0ff'].forEach(function(c,i){ctx.fillStyle=c;ctx.fillRect(cbXR+i*cbW,cbY,cbW,cbH);});
-
-  var grW=Math.round(aW*0.26),grH=Math.round(aH*0.10);
-  var grXL=aX+Math.round(aW*0.065),grXR=aX+aW-Math.round(aW*0.065)-grW;
-  var grY1=aY+Math.round(aH*0.53),grY2=aY+Math.round(aH*0.64);
-  function ramp(x,y,w,h,ltd){var g=ctx.createLinearGradient(x,y,x+w,y);g.addColorStop(0,ltd?'#fff':'#000');g.addColorStop(1,ltd?'#000':'#fff');ctx.fillStyle=g;ctx.fillRect(x,y,w,h);}
-  ramp(grXL,grY1,grW,grH,true);ramp(grXL,grY2,grW,grH,false);
-  ramp(grXR,grY1,grW,grH,true);ramp(grXR,grY2,grW,grH,false);
-
-  var bdW=Math.round(aW*0.075),bdH=Math.round(aH*0.065),bdY=Math.round(cy-bdH/2),bdFs=Math.round(bdH*0.38);
-  function brand(x,bg,fg){
-    ctx.fillStyle=bg;ctx.fillRect(x,bdY,bdW,bdH);
-    ctx.fillStyle=fg;ctx.font='bold '+bdFs+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText('DCI',x+bdW/2,bdY+bdH*0.3);ctx.fillText('Calc',x+bdW/2,bdY+bdH*0.72);
+  /* 3 — identification boxes (left upper, right lower), just inside the format's side edges */
+  var ibW=W*0.051,ibH=H*0.098;
+  function idBox(x,y){
+    var bl=Math.max(2,W*0.0015);
+    ctx.fillStyle='#fff';ctx.fillRect(x,y,ibW,ibH);
+    ctx.fillStyle='#e00';ctx.fillRect(x+bl,y+bl,ibW-2*bl,(ibH-2*bl)*0.62);
+    ctx.fillStyle='#5a5a5a';ctx.fillRect(x+bl,y+bl+(ibH-2*bl)*0.62,ibW-2*bl,(ibH-2*bl)*0.38);
+    ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+    var f1=Math.round(ibH*0.2);ctx.font='bold '+f1+'px '+CHART_FONT;var tw=ctx.measureText('DCI CALC').width,room=(ibW-2*bl)*0.84;
+    if(tw>room){f1=Math.floor(f1*room/tw);ctx.font='bold '+f1+'px '+CHART_FONT;}
+    ctx.fillText('DCI CALC',x+ibW/2,y+ibH*0.3);
+    ctx.font=Math.round(ibH*0.11)+'px '+CHART_FONT;ctx.textAlign='right';ctx.fillText(r.ratioVal.toFixed(2)+':1',x+ibW-bl*3,y+ibH*0.82);
   }
-  brand(aX+Math.round(aW*0.008),'#c00','#fff');
-  brand(aX+aW-Math.round(aW*0.008)-bdW,'#fff','#c00');
+  idBox(A.x+W*0.01,H*0.338);
+  idBox(A.x+A.w-W*0.01-ibW,H*0.566);
 
-  var tSz=Math.round(W*0.055),tPad=tSz*0.6;
-  drawFocusTarget(ctx,aX+tPad,   aY+tPad,   tSz);
-  drawFocusTarget(ctx,aX+aW-tPad,aY+tPad,   tSz);
-  drawFocusTarget(ctx,aX+tPad,   aY+aH-tPad,tSz);
-  drawFocusTarget(ctx,aX+aW-tPad,aY+aH-tPad,tSz);
+  /* 4 — format markings */
+  var hl=H*0.019,hw=H*0.0085,stemV=H*0.045,stemH=W*0.024;
+  function vArrow(x,yEdge,dir,col){ /* dir -1: points up (tip at edge, stem below) · +1: points down */
+    ctx.fillStyle=col;ctx.fillRect(x-lw/2,dir<0?yEdge+hl*0.9:yEdge-stemV,lw,stemV-hl*0.9);
+    ctx.beginPath();ctx.moveTo(x,yEdge);ctx.lineTo(x-hw,yEdge-dir*hl);ctx.lineTo(x+hw,yEdge-dir*hl);ctx.closePath();ctx.fill();
+  }
+  function hArrow(xEdge,y,dir,col){ /* dir -1: points left · +1: points right */
+    ctx.fillStyle=col;ctx.fillRect(dir<0?xEdge+hl*0.9:xEdge-stemH,y-lw/2,stemH-hl*0.9,lw);
+    ctx.beginPath();ctx.moveTo(xEdge,y);ctx.lineTo(xEdge-dir*hl,y-hw);ctx.lineTo(xEdge-dir*hl,y+hw);ctx.closePath();ctx.fill();
+  }
+  function fmtLabel(y,col,dims,name,top){
+    var g=W*0.006;ctx.fillStyle=col;ctx.font=fs+'px '+CHART_FONT;ctx.textBaseline='middle';
+    ctx.textAlign='right';ctx.fillText(top?dims:name,cx-g,y);
+    ctx.textAlign='left';ctx.fillText(top?name:dims,cx+g,y);
+  }
+  function drawFormat(R,col,name,sideFr,labelLine){
+    ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.strokeRect(R.x+lw/2,R.y+lw/2,R.w-lw,R.h-lw);
+    [R.x+R.w*0.1465,R.x+R.w*0.8535].forEach(function(x){vArrow(x,R.y,-1,col);vArrow(x,R.y+R.h,1,col);});
+    sideFr.forEach(function(f){var y=H*f;hArrow(R.x,y,-1,col);hArrow(R.x+R.w,y,1,col);});
+    var dims=R.w+' x '+R.h,off=H*0.026+labelLine*fs*1.35;
+    fmtLabel(R.y+off,col,dims,name,true);
+    fmtLabel(R.y+R.h-off,col,dims,name,false);
+  }
+  /* RGB convergence ticks on the crosshair, just inside the format edges */
+  var tk=W*0.012;
+  [['#f00',0],['#0f0',1],['#00f',2]].forEach(function(p){
+    ctx.fillStyle=p[0];var o=W*0.014+p[1]*tk;
+    ctx.fillRect(A.x+o,Math.round(cy)-lw/2,tk,lw);ctx.fillRect(A.x+A.w-o-tk,Math.round(cy)-lw/2,tk,lw);
+    var ov=H*0.06+p[1]*tk;ctx.fillRect(Math.round(cx)-lw/2,A.y+ov,lw,tk);ctx.fillRect(Math.round(cx)-lw/2,A.y+A.h-ov-tk,lw,tk);
+  });
 
-  var cTsz=Math.round(tSz*0.65);
-  drawFocusTarget(ctx,cx-circR*0.32,cy,cTsz);
-  drawFocusTarget(ctx,cx+circR*0.32,cy,cTsz);
+  var name=r.snapped?FMT_NAME[r.snapped].toUpperCase():r.ratioVal.toFixed(2)+':1';
+  var showCont=(C.w!==W||C.h!==H)&&(C.w!==A.w||C.h!==A.h);
+  if(showCont){
+    /* stack the container label under the format label when their edges coincide */
+    var line=(C.y===A.y)?1:0;
+    drawFormat(C,RED,FMT_NAME[r.fmt].toUpperCase(),[0.25,0.75],line);
+  }
+  drawFormat(A,GREEN,name,[0.27,0.73],0);
 
-  if(r.cont.w<W){
-    ctx.strokeStyle='#0f0';ctx.lineWidth=lw;
-    ctx.beginPath();ctx.moveTo(coX,0);ctx.lineTo(coX,H);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(W-coX,0);ctx.lineTo(W-coX,H);ctx.stroke();
-  }
-  if(r.cont.h<H){
-    ctx.strokeStyle='#f00';ctx.lineWidth=lw;
-    ctx.beginPath();ctx.moveTo(0,coY);ctx.lineTo(W,coY);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(0,H-coY);ctx.lineTo(W,H-coY);ctx.stroke();
-  }
-  if(aW<r.cont.w||aH<r.cont.h){
-    ctx.save();ctx.strokeStyle='rgba(255,255,255,0.7)';ctx.lineWidth=lw;
-    ctx.setLineDash([lw*5,lw*3]);ctx.strokeRect(aX,aY,aW,aH);ctx.restore();
-  }
-
-  var as2=Math.round(H*0.025);
-  function arrow(ax,ay,dir,col){
-    ctx.fillStyle=col;ctx.beginPath();
-    if(dir==='u'){ctx.moveTo(ax,ay-as2);ctx.lineTo(ax-as2*.6,ay);ctx.lineTo(ax+as2*.6,ay);}
-    if(dir==='d'){ctx.moveTo(ax,ay+as2);ctx.lineTo(ax-as2*.6,ay);ctx.lineTo(ax+as2*.6,ay);}
-    if(dir==='l'){ctx.moveTo(ax-as2,ay);ctx.lineTo(ax,ay-as2*.6);ctx.lineTo(ax,ay+as2*.6);}
-    if(dir==='r'){ctx.moveTo(ax+as2,ay);ctx.lineTo(ax,ay-as2*.6);ctx.lineTo(ax,ay+as2*.6);}
-    ctx.closePath();ctx.fill();
-  }
-  if(r.cont.w<W){[cy,aY+aH*0.25,aY+aH*0.75].forEach(function(y2){arrow(coX,y2,'l','#0f0');arrow(W-coX,y2,'r','#0f0');});}
-  if(r.cont.h<H){[cx,aX+aW*0.25,aX+aW*0.75].forEach(function(x2){arrow(x2,coY,'u','#f00');arrow(x2,H-coY,'d','#f00');});}
-
-  /* outlined text so labels stay readable on any background */
-  function label(txt,x,y,col,align,base,rot){
-    ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot);
-    ctx.font='bold '+fs+'px Arial';ctx.textAlign=align;ctx.textBaseline=base;
-    ctx.lineJoin='round';ctx.lineWidth=Math.max(3,fs*0.22);ctx.strokeStyle='#000';ctx.strokeText(txt,0,0);
-    ctx.fillStyle=col;ctx.fillText(txt,0,0);ctx.restore();
-  }
-  /* active size: above the active area if there is room, otherwise just inside its top edge */
-  var aLbl=aW+' × '+aH+'   '+r.ratioVal.toFixed(4)+':1';
-  if(aY>=fs*1.6)label(aLbl,cx,aY-Math.round(fs*0.4),'#fff','center','bottom');
-  else label(aLbl,cx,aY+Math.round(fs*0.5),'#fff','center','top');
-  /* flat container: the side margins are too narrow for text, so run the label vertically just inside each green edge */
-  if(r.cont.w<W){
-    var cl1=r.cont.w+' × '+r.cont.h+'  FLAT';
-    label(cl1,coX+fs*0.4,aY+aH*0.375,'#0f0','center','top',-Math.PI/2);
-    label(cl1,W-coX-fs*0.4,aY+aH*0.625,'#0f0','center','top',Math.PI/2);
-  }
-  ctx.font='bold '+fs+'px Arial';
-  if(r.cont.h<H){
-    var cl2=r.cont.w+' × '+r.cont.h+'  SCOPE';
-    label(cl2,cx-fs*0.5,coY+fs*0.3,'#f00','right','top');
-    label(cl2,cx+fs*0.5,H-coY-fs*0.3,'#f00','left','bottom');
-  }
-  ctx.fillStyle='rgba(255,255,255,0.35)';ctx.font='bold '+Math.round(fs*0.7)+'px Arial';
-  ctx.textAlign='right';ctx.textBaseline='top';ctx.fillText(W+' × '+H,W-fs*0.5,fs*0.4);
+  /* 5 — corner focus targets inside the format, number strip beneath */
+  var s=Math.round(W*0.048),pd=W*0.006,nl=Math.round(s*0.2),bottomRoom=s+nl*1.35;
+  [[A.x+pd,A.y+pd*1.6],[A.x+A.w-pd-s,A.y+pd*1.6],[A.x+pd,A.y+A.h-pd-bottomRoom],[A.x+A.w-pd-s,A.y+A.h-pd-bottomRoom]].forEach(function(p){
+    drawChartTarget(ctx,p[0],p[1],s,false);
+    ctx.font='bold '+nl+'px '+CHART_FONT;ctx.fillStyle=GREEN;ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText('123456789',p[0]+s/2,p[1]+s+nl*0.12,s*1.02);
+  });
 }
 
 var testState={lastRk:null,lastCanvas:null};
