@@ -144,7 +144,7 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tab:hover{color:var(--text)}
 .tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
 .tabs::-webkit-scrollbar{display:none}
-@media(max-width:480px){.tab{padding:.6rem .5rem;font-size:.84rem;gap:.35rem}}
+@media(max-width:480px){.tab{padding:.6rem .45rem;font-size:.84rem;gap:.35rem}.tab svg{display:none}.hero strong{font-size:1.1rem}}
 .pane{display:none}.pane.active{display:block}
 
 /* ── Result cards ───────────────────────────────────── */
@@ -200,6 +200,20 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rtable th{text-align:left;font-weight:500;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;padding:.4rem .5rem .4rem 0;border-bottom:1px solid var(--border)}
 .rtable td{padding:.5rem .5rem .5rem 0;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums}
 .rtable td:first-child{font-family:var(--sans);font-weight:600}
+
+/* ── Screen ─────────────────────────────────────────── */
+.scr-controls{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:.9rem;margin-bottom:1rem;align-items:end}
+@media(max-width:720px){.scr-controls{grid-template-columns:1fr 1fr}.scr-controls>div:first-child{grid-column:1/-1}}
+.scr-controls .text-in:disabled{opacity:.45}
+.scr-wrap{margin-bottom:1rem}
+.scr-wrap canvas{display:block;width:100%;height:auto;cursor:default}
+.scr-sub{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:1.25rem 0 .4rem}
+.rtable tr.cur td{color:var(--accent);font-weight:600}
+.rtable tr.clk{cursor:pointer}
+.rtable tr.clk:hover td{background:var(--surface-2)}
+.fillbar{display:inline-block;width:60px;height:6px;border-radius:3px;background:var(--surface-3);vertical-align:middle;margin-right:.5rem;overflow:hidden}
+.fillbar i{display:block;height:100%;background:var(--accent)}
+@media(max-width:560px){.rtable .hide-sm{display:none}}
 
 /* ── Test chart ─────────────────────────────────────── */
 #test-info{font-size:.82rem;color:var(--muted);background:var(--surface-2);border-radius:var(--radius-sm);padding:.5rem .7rem;margin-bottom:1rem}
@@ -293,6 +307,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>Pixels → Ratio</button>
       <button class="tab" role="tab" data-tab="test" aria-selected="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="1.5"/><circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/></svg>Test chart</button>
+      <button class="tab" role="tab" data-tab="screen" aria-selected="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6c6-1.6 12-1.6 18 0v10c-6-1.6-12-1.6-18 0z"/><path d="M8 21h8"/></svg>Screen</button>
     </nav>
 
     <section class="pane active" id="pane-layout">
@@ -308,6 +324,32 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent}
           <div><label class="field-label" for="rev-h">Height</label><input class="text-in" type="text" id="rev-h" placeholder="1080" autocomplete="off" inputmode="numeric"></div>
         </div>
         <div id="rev-out"></div>
+      </div>
+    </section>
+
+    <section class="pane" id="pane-screen">
+      <div class="panel pad">
+        <p class="pane-intro">See how the current format fills a cinema screen. The picture is scaled as large as the screen allows, the way a projector with lens memory and masking presents it.</p>
+        <div class="scr-controls">
+          <div>
+            <div class="field-label">Screen shape</div>
+            <div class="seg" id="seg-screen" role="group" aria-label="Screen shape">
+              <button data-v="flat"><b>Flat</b><small>1.85</small></button>
+              <button data-v="scope"><b>Scope</b><small>2.39</small></button>
+              <button data-v="custom"><b>Custom</b><small id="scr-custom-lbl">—</small></button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="scr-ratio">Screen ratio <span class="hint">2.00 · 12.5x5.2</span></label>
+            <input class="text-in" type="text" id="scr-ratio" autocomplete="off" spellcheck="false" inputmode="decimal" placeholder="2.00">
+          </div>
+          <div>
+            <label class="field-label" for="scr-width">Width <span class="hint">metres, optional</span></label>
+            <input class="text-in" type="text" id="scr-width" autocomplete="off" inputmode="decimal" placeholder="12">
+          </div>
+        </div>
+        <div class="cwrap scr-wrap" id="scr-wrap"><canvas id="scr-cv" aria-label="Screen preview"></canvas></div>
+        <div id="scr-out"></div>
       </div>
     </section>
 
@@ -356,7 +398,7 @@ var state={fmt:'full',res:'both',results:[],resizeRaf:null,toastTimer:null,defer
    MATHS  (unchanged behaviour)
 ════════════════════════════════════ */
 function parseRatio(raw){
-  var s=raw.trim().replace(/[^0-9.:/]/g,'');if(!s)return null;
+  var s=String(raw).trim().replace(/,/g,'.').replace(/\s*[x×X*]\s*/g,':').replace(/[^0-9.:/]/g,'');if(!s)return null;
   var sep=s.indexOf(':')>=0?':':s.indexOf('/')>=0?'/':null;
   if(sep){var p=s.split(sep).map(Number);return(p.length===2&&p[0]>0&&p[1]>0&&!isNaN(p[0])&&!isNaN(p[1]))?p[0]/p[1]:null;}
   var n=parseFloat(s);return(n>0&&!isNaN(n))?n:null;
@@ -573,7 +615,7 @@ function buildReverse(){
 function runCalc(){
   var raw=document.getElementById('ratio').value,rv=parseRatio(raw);
   try{localStorage.setItem('dci_ratio',raw);localStorage.setItem('dci_fmt',state.fmt);localStorage.setItem('dci_res',state.res);}catch(e){}
-  try{history.replaceState(null,'','#r='+encodeURIComponent(raw)+'&f='+state.fmt+'&res='+state.res);}catch(e){}
+  saveHash();
   document.querySelectorAll('.preset').forEach(function(b){b.classList.toggle('active',rv!==null&&Math.abs(parseFloat(b.dataset.v)-rv)<0.0001);});
   document.querySelectorAll('#seg-fmt button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===state.fmt);});
   document.querySelectorAll('#seg-res button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===state.res);});
@@ -584,7 +626,7 @@ function runCalc(){
   box.classList.toggle('bad',bad);read.classList.toggle('bad',bad);
   read.textContent=rv?'= '+rv.toFixed(4)+' : 1':(bad?'Not a valid ratio':'');
   state.results=rv?resKeys().map(function(rk){return computeResult(rk,rv,state.fmt);}):[];
-  buildLayout();updateTestInfo();buildReverse();
+  buildLayout();updateTestInfo();buildReverse();buildScreen();
 }
 function updateTestInfo(){
   var el=document.getElementById('test-info');
@@ -615,12 +657,13 @@ function openModalWith(draw,asp){
 function closeModal(){var m=document.getElementById('modal');m.classList.remove('open');m.setAttribute('aria-hidden','true');document.body.style.overflow='';}
 document.getElementById('modal').addEventListener('click',closeModal);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
-window.addEventListener('resize',function(){cancelAnimationFrame(state.resizeRaf);state.resizeRaf=requestAnimationFrame(redrawAll);});
+window.addEventListener('resize',function(){cancelAnimationFrame(state.resizeRaf);state.resizeRaf=requestAnimationFrame(function(){redrawAll();drawScreenCanvas();});});
 
 function activateTab(name){
   document.querySelectorAll('.tab').forEach(function(b){b.setAttribute('aria-selected',b.dataset.tab===name);});
   document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('active',p.id==='pane-'+name);});
   if(name==='layout')requestAnimationFrame(redrawAll);
+  if(name==='screen')requestAnimationFrame(drawScreenCanvas);
 }
 document.querySelectorAll('.tab').forEach(function(b){b.addEventListener('click',function(){activateTab(b.dataset.tab);});});
 
@@ -663,6 +706,149 @@ document.getElementById('ratio').addEventListener('input',debounce(runCalc,200))
 document.getElementById('ratio').addEventListener('focus',function(){this.select();});
 document.getElementById('rev-w').addEventListener('input',debounce(buildReverse,200));
 document.getElementById('rev-h').addEventListener('input',debounce(buildReverse,200));
+
+/* ════════════════════════════════════
+   SCREEN PREVIEW
+   Picture is fitted as large as possible on the screen:
+   wider than the screen  → full width, unused top & bottom (constant width)
+   narrower than the screen → full height, unused left & right (constant height)
+════════════════════════════════════ */
+var SCREEN_RATIOS={flat:1.85,scope:2.39};
+var scr={type:'scope',custom:'',width:''};
+function parseMetres(v){var n=parseFloat(String(v).replace(',','.'));return n>0&&isFinite(n)?n:null;}
+function screenRatio(){return scr.type==='custom'?parseRatio(scr.custom):SCREEN_RATIOS[scr.type];}
+function screenFit(S,R){
+  /* returns fractions of screen width/height used by the picture */
+  if(Math.abs(R-S)<0.005)return{fw:1,fh:1,mode:'match'};
+  if(R>S)return{fw:1,fh:S/R,mode:'width'};
+  return{fw:R/S,fh:1,mode:'height'};
+}
+function fmtM(v){return v>=10?v.toFixed(1):v.toFixed(2);}
+function saveHash(){
+  var raw=document.getElementById('ratio').value;
+  var h='#r='+encodeURIComponent(raw)+'&f='+state.fmt+'&res='+state.res+'&s='+scr.type;
+  if(scr.type==='custom'&&scr.custom)h+='&sr='+encodeURIComponent(scr.custom);
+  if(scr.width)h+='&sw='+encodeURIComponent(scr.width);
+  try{history.replaceState(null,'',h);}catch(e){}
+  try{localStorage.setItem('dci_scr',scr.type);localStorage.setItem('dci_scr_r',scr.custom);localStorage.setItem('dci_scr_w',scr.width);}catch(e){}
+}
+function currentRatio(){return parseRatio(document.getElementById('ratio').value);}
+
+function buildScreen(){
+  document.querySelectorAll('#seg-screen button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===scr.type);});
+  var ri=document.getElementById('scr-ratio'),wi=document.getElementById('scr-width');
+  ri.disabled=scr.type!=='custom';
+  if(scr.type!=='custom')ri.value=SCREEN_RATIOS[scr.type].toFixed(2);
+  else if(document.activeElement!==ri)ri.value=scr.custom;
+  if(document.activeElement!==wi)wi.value=scr.width;
+  var cr=parseRatio(scr.custom);
+  document.getElementById('scr-custom-lbl').textContent=cr?cr.toFixed(2):'—';
+
+  var out=document.getElementById('scr-out'),S=screenRatio(),R=currentRatio(),Wm=parseMetres(scr.width);
+  if(!S){out.innerHTML='<div class="note warn">Enter the screen ratio, e.g. 2.00, 16:9 or width x height like 12.5x5.2.</div>';drawScreenCanvas();return;}
+  if(!R){out.innerHTML='<div class="note warn">Enter a valid aspect ratio in the settings to preview it.</div>';drawScreenCanvas();return;}
+  var f=screenFit(S,R),fill=(f.fw*f.fh*100);
+  var Hm=Wm?Wm/S:null;
+  var size=Wm?fmtM(Wm*f.fw)+' × '+fmtM(Hm*f.fh)+' m':Math.round(f.fw*100)+'% × '+Math.round(f.fh*100)+'%';
+  var sizeSub=Wm?'Screen '+fmtM(Wm)+' × '+fmtM(Hm)+' m':'of screen width × height';
+  var how={match:'Fills the whole screen',width:'Full width · unused top & bottom',height:'Full height · unused left & right'}[f.mode];
+  var note={
+    match:'The format matches the screen, so the picture fills it edge to edge.',
+    width:'Constant width: the picture is wider than the screen, so it uses the full width and leaves '+(Wm?fmtM((Hm-Hm*f.fh)/2)+' m':Math.round((1-f.fh)*50)+'%')+' of screen unused above and below. Top/bottom masking closes this in.',
+    height:'Constant height: the picture is narrower than the screen, so it uses the full height and leaves '+(Wm?fmtM((Wm-Wm*f.fw)/2)+' m':Math.round((1-f.fw)*50)+'%')+' of screen unused on each side. Side masking closes this in.'
+  }[f.mode];
+  var html='<div class="hero">'+
+    '<div><small>Picture on screen</small><strong>'+size+'</strong><em>'+sizeSub+'</em></div>'+
+    '<div><small>Screen used</small><strong>'+fill.toFixed(1)+'%</strong><em>'+how+'</em></div></div>'+
+    '<div class="note info" style="margin-top:.75rem">'+note+'</div>';
+
+  /* comparison of all presets on this screen */
+  var rows=PRESETS.map(function(p){return{v:parseFloat(p.v),n:p.n,txt:p.v};});
+  if(!rows.some(function(x){return Math.abs(x.v-R)<0.0001;}))rows.push({v:R,n:'Current',txt:R.toFixed(2)});
+  rows.sort(function(a,b){return a.v-b.v;});
+  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th><th class="hide-sm">Presentation</th></tr></thead><tbody>';
+  rows.forEach(function(x){
+    var g=screenFit(S,x.v),u=g.fw*g.fh*100,cur=Math.abs(x.v-R)<0.0001;
+    var dims=Wm?fmtM(Wm*g.fw)+' × '+fmtM(Hm*g.fh):Math.round(g.fw*100)+'% × '+Math.round(g.fh*100)+'%';
+    var pres={match:'Fills screen',width:'Constant width',height:'Constant height'}[g.mode];
+    html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td><td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  out.innerHTML=html;
+  drawScreenCanvas();
+}
+document.getElementById('scr-out').addEventListener('click',function(e){
+  var tr=e.target.closest('tr[data-v]');if(!tr)return;
+  document.getElementById('ratio').value=tr.dataset.v;runCalc();
+});
+
+function drawScreenCanvas(){
+  var wrap=document.getElementById('scr-wrap'),cv=document.getElementById('scr-cv');
+  if(!wrap||!wrap.clientWidth)return;
+  var S=screenRatio(),R=currentRatio(),Wm=parseMetres(scr.width);
+  var cssW=wrap.clientWidth,dpr=window.devicePixelRatio||1;
+  /* room layout: screen centred with margin for dimension marks */
+  var mx=Math.max(28,cssW*0.06),mt=Math.max(18,cssW*0.035),mb=Math.max(40,cssW*0.075);
+  var sw=cssW-mx*2,sh=S?sw/S:sw/2.39;
+  var maxH=Math.min(520,window.innerHeight*0.55);
+  if(sh>maxH){sh=maxH;sw=sh*(S||2.39);}
+  var cssH=Math.round(sh+mt+mb),sx=(cssW-sw)/2,sy=mt;
+  cv.width=Math.round(cssW*dpr);cv.height=Math.round(cssH*dpr);cv.style.aspectRatio=cssW+' / '+cssH;
+  var ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  var C={bg:cssVar('--canvas-bg'),text:cssVar('--canvas-text'),muted:cssVar('--muted'),bar:cssVar('--canvas-bar'),acc:cssVar('--canvas-act-stroke'),mono:cssVar('--mono')};
+  /* auditorium */
+  var room=ctx.createLinearGradient(0,0,0,cssH);room.addColorStop(0,'#141518');room.addColorStop(1,'#07080a');
+  ctx.fillStyle=room;ctx.fillRect(0,0,cssW,cssH);
+  if(!S){return;}
+  /* screen surface (unlit) */
+  ctx.fillStyle='#2c2f35';ctx.fillRect(sx,sy,sw,sh);
+  ctx.fillStyle=hatch(ctx,'rgba(255,255,255,0.06)',Math.max(8,Math.round(cssW/70)));ctx.fillRect(sx,sy,sw,sh);
+  if(R){
+    var f=screenFit(S,R),pw=sw*f.fw,ph=sh*f.fh,px=sx+(sw-pw)/2,py=sy+(sh-ph)/2;
+    /* projected picture: simple horizon scene so the shape reads as an image */
+    ctx.save();ctx.beginPath();ctx.rect(px,py,pw,ph);ctx.clip();
+    var g=ctx.createLinearGradient(0,py,0,py+ph);
+    g.addColorStop(0,'#1d3557');g.addColorStop(0.55,'#e09f3e');g.addColorStop(0.56,'#3a2e28');g.addColorStop(1,'#15110f');
+    ctx.fillStyle=g;ctx.fillRect(px,py,pw,ph);
+    ctx.fillStyle='rgba(255,236,200,0.9)';ctx.beginPath();ctx.arc(px+pw*0.5,py+ph*0.55,Math.min(pw,ph)*0.09,Math.PI,0);ctx.fill();
+    ctx.restore();
+    /* light spill glow + outline */
+    ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=1;ctx.strokeRect(px+.5,py+.5,pw-1,ph-1);
+    /* label */
+    var big=Math.max(12,Math.min(pw*0.06,ph*0.2,34));
+    var lbl=R.toFixed(2)+':1'+(Wm?'  ·  '+fmtM(Wm*f.fw)+' × '+fmtM(Wm/S*f.fh)+' m':'');
+    oText(ctx,lbl,px+pw/2,py+ph*0.28,'600 '+big+'px '+C.mono,'center','middle',{text:'#fff',stroke:'rgba(0,0,0,.6)'});
+    /* unused-area labels */
+    var sm=Math.max(10,Math.min(cssW*0.018,13));
+    ctx.font='500 '+sm+'px '+C.mono;ctx.fillStyle='rgba(255,255,255,0.55)';ctx.textAlign='center';ctx.textBaseline='middle';
+    if(f.mode==='width'&&(sh-ph)/2>sm*1.6){ctx.fillText('unused',sx+sw/2,sy+(sh-ph)/4);ctx.fillText('unused',sx+sw/2,sy+sh-(sh-ph)/4);}
+    if(f.mode==='height'&&(sw-pw)/2>sm*5){ctx.fillText('unused',sx+(sw-pw)/4,sy+sh/2);ctx.fillText('unused',sx+sw-(sw-pw)/4,sy+sh/2);}
+  }
+  /* screen frame */
+  ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1;ctx.strokeRect(sx+.5,sy+.5,sw-1,sh-1);
+  /* dimension marks */
+  var dm=Math.max(10,Math.min(cssW*0.02,14)),yl=sy+sh+dm*1.4;
+  ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(sx,yl);ctx.lineTo(sx+sw,yl);ctx.moveTo(sx,yl-4);ctx.lineTo(sx,yl+4);ctx.moveTo(sx+sw,yl-4);ctx.lineTo(sx+sw,yl+4);ctx.stroke();
+  var wl=(Wm?fmtM(Wm)+' m':'Screen')+'  ·  '+S.toFixed(2)+':1';
+  ctx.font='500 '+dm+'px '+C.mono;var tw=ctx.measureText(wl).width+12;
+  ctx.fillStyle='#0b0c0e';ctx.fillRect(sx+sw/2-tw/2,yl-dm,tw,dm*2);
+  ctx.fillStyle='rgba(255,255,255,0.75)';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(wl,sx+sw/2,yl);
+  if(Wm){
+    var xr=sx+sw+Math.min(mx*0.45,14);
+    ctx.beginPath();ctx.moveTo(xr,sy);ctx.lineTo(xr,sy+sh);ctx.moveTo(xr-4,sy);ctx.lineTo(xr+4,sy);ctx.moveTo(xr-4,sy+sh);ctx.lineTo(xr+4,sy+sh);ctx.stroke();
+    ctx.save();ctx.translate(xr+dm*0.9,sy+sh/2);ctx.rotate(Math.PI/2);ctx.fillStyle='rgba(255,255,255,0.75)';ctx.fillText(fmtM(Wm/S)+' m',0,0);ctx.restore();
+  }
+}
+
+document.getElementById('seg-screen').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;scr.type=b.dataset.v;
+  if(scr.type==='custom'&&!scr.custom){scr.custom='2.00';}
+  saveHash();buildScreen();
+  if(scr.type==='custom'){var ri=document.getElementById('scr-ratio');ri.focus();ri.select();}
+});
+document.getElementById('scr-ratio').addEventListener('input',debounce(function(){scr.custom=document.getElementById('scr-ratio').value;saveHash();buildScreen();},200));
+document.getElementById('scr-width').addEventListener('input',debounce(function(){scr.width=document.getElementById('scr-width').value.trim();saveHash();buildScreen();},200));
 
 /* PWA install */
 (function(){
@@ -866,6 +1052,9 @@ document.getElementById('dl-test-btn').addEventListener('click',function(){
   state.fmt=CONTAINERS[f]?f:'full';
   state.res=(rs==='2k'||rs==='4k'||rs==='both')?rs:'both';
   document.getElementById('ratio').value=params.get('r')||ls('dci_ratio')||'2.39';
+  var st=params.get('s')||ls('dci_scr');scr.type=(st==='flat'||st==='scope'||st==='custom')?st:'scope';
+  scr.custom=params.get('sr')||ls('dci_scr_r')||'';
+  scr.width=params.get('sw')||ls('dci_scr_w')||'';
   runCalc();
 }());
 
