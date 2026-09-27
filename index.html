@@ -751,6 +751,31 @@ var FILM_ART={
     c.lineWidth=Math.max(1,h*0.004);for(var o=0;o<11;o++){var ox=sx+sl*(0.15+o*0.065);c.beginPath();c.moveTo(ox,sy);c.lineTo(ox-w*0.02,sy+h*0.06);c.stroke();}
     vignette(c,x,y,w,h,0.5);}},
 
+  '1.50':{t:'Digger',y:'2026',draw:function(c,x,y,w,h){
+    var hz=y+h*0.7;
+    c.fillStyle=vgrad(c,y,hz,[[0,'#1e2a3a'],[0.5,'#8a4a2a'],[1,'#f0b050']]);c.fillRect(x,y,w,hz-y);
+    var r=seeded(15);
+    for(var i=0;i<10;i++){c.fillStyle='rgba(20,14,12,'+(0.25+r()*0.3)+')';c.beginPath();c.ellipse(x+w*(0.45+r()*0.4),y+h*(0.05+r()*0.3),w*(0.08+r()*0.12),h*(0.05+r()*0.07),0,0,7);c.fill();}
+    c.fillStyle=vgrad(c,hz,y+h,[[0,'#5a3a1e'],[1,'#1f140a']]);c.fillRect(x,hz,w,y+h-hz);
+    function pump(px,sc){var pb=hz+h*0.02,s=h*0.16*sc;c.fillStyle='#120c08';c.strokeStyle='#120c08';c.lineWidth=Math.max(1,s*0.05);
+      poly(c,[[px-s*0.25,pb],[px+s*0.25,pb],[px+s*0.03,pb-s*0.7],[px-s*0.03,pb-s*0.7]],'#120c08');
+      c.save();c.translate(px,pb-s*0.72);c.rotate(-0.12);c.fillRect(-s*0.75,-s*0.06,s*1.4,s*0.12);
+      c.beginPath();c.moveTo(-s*0.75,-s*0.06);c.quadraticCurveTo(-s*0.95,s*0.05,-s*0.78,s*0.22);c.lineTo(-s*0.66,s*0.2);c.lineTo(-s*0.66,-s*0.06);c.fill();c.restore();
+      c.beginPath();c.moveTo(px-s*0.7,pb-s*0.55);c.lineTo(px-s*0.7,pb);c.stroke();c.fillRect(px+s*0.35,pb-s*0.35,s*0.25,s*0.35);}
+    pump(x+w*0.12,0.8);pump(x+w*0.3,0.6);pump(x+w*0.86,0.9);
+    var dx=x+w*0.58,db=hz+h*0.03,dh=h*0.4,dw=w*0.085;c.strokeStyle='#0d0806';c.lineWidth=Math.max(1,w*0.004);
+    c.beginPath();c.moveTo(dx-dw/2,db);c.lineTo(dx-dw*0.08,db-dh);c.lineTo(dx+dw*0.08,db-dh);c.lineTo(dx+dw/2,db);c.stroke();
+    for(var k=1;k<7;k++){var t=k/7,yy=db-dh*t,half=dw/2*(1-t)+dw*0.08*t,half2=dw/2*(1-(k-1)/7)+dw*0.08*((k-1)/7),yy2=db-dh*(k-1)/7;
+      c.beginPath();c.moveTo(dx-half,yy);c.lineTo(dx+half,yy);c.moveTo(dx-half2,yy2);c.lineTo(dx+half,yy);c.moveTo(dx+half2,yy2);c.lineTo(dx-half,yy);c.stroke();}
+    var top=db-dh,gh=h*0.3;
+    c.fillStyle='#0a0605';c.beginPath();c.moveTo(dx-w*0.01,top);
+    c.bezierCurveTo(dx-w*0.02,top-gh*0.5,dx-w*0.03,top-gh*0.9,dx-w*0.09,top-gh*0.95);
+    c.bezierCurveTo(dx-w*0.03,top-gh*1.1,dx+w*0.04,top-gh*1.1,dx+w*0.1,top-gh*0.9);
+    c.bezierCurveTo(dx+w*0.04,top-gh*0.9,dx+w*0.02,top-gh*0.5,dx+w*0.01,top);c.closePath();c.fill();
+    for(var d=0;d<40;d++){var a=Math.PI*(1.05+r()*0.9),dist=gh*(0.8+r()*0.5);c.beginPath();c.ellipse(dx+Math.cos(a)*dist*0.55,top-gh*0.95+Math.sin(a)*-dist*0.35+r()*gh*0.9,Math.max(1,w*0.004*r()+1),Math.max(1.5,h*0.012*r()+1.5),0,0,7);c.fill();}
+    c.fillStyle='rgba(10,6,5,0.85)';c.beginPath();c.ellipse(dx,db+h*0.02,w*0.14,h*0.025,0,0,7);c.fill();
+    vignette(c,x,y,w,h,0.5);}},
+
   '1.66':{t:'Olsen-banden',y:'1968–98',draw:function(c,x,y,w,h){
     c.fillStyle='#b8692a';c.fillRect(x,y,w,h);
     var d=h*0.12;for(var yy=0;yy<h*0.8;yy+=d)for(var xx=(Math.round(yy/d)%2)*d/2;xx<w+d;xx+=d){c.fillStyle='#8f4a1a';c.beginPath();c.arc(x+xx,y+yy,d*0.32,0,7);c.fill();c.fillStyle='#e0a050';c.beginPath();c.arc(x+xx,y+yy,d*0.16,0,7);c.fill();}
