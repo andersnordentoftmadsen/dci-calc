@@ -896,7 +896,7 @@ function filmArtFor(R){for(var k in FILM_ART){if(Math.abs(parseFloat(k)-R)<0.005
    narrower than the screen → full height, unused left & right (constant height)
 ════════════════════════════════════ */
 var SCREEN_RATIOS={flat:1.85,scope:2.39};
-var scr={type:'scope',custom:'',width:'',lens:'motor'};
+var scr={type:'scope',custom:'',width:'',lens:'motor',dcp:'auto'};
 function parseMetres(v){var n=parseFloat(String(v).replace(',','.'));return n>0&&isFinite(n)?n:null;}
 function screenRatio(){return scr.type==='custom'?parseRatio(scr.custom):SCREEN_RATIOS[scr.type];}
 function screenFit(S,R){
@@ -912,8 +912,9 @@ function saveHash(){
   if(scr.type==='custom'&&scr.custom)h+='&sr='+encodeURIComponent(scr.custom);
   if(scr.width)h+='&sw='+encodeURIComponent(scr.width);
   if(scr.lens==='fixed')h+='&lens=fixed';
+  if(scr.dcp!=='auto')h+='&dcp='+scr.dcp;
   try{history.replaceState(null,'',h);}catch(e){}
-  try{localStorage.setItem('dci_scr',scr.type);localStorage.setItem('dci_scr_r',scr.custom);localStorage.setItem('dci_scr_w',scr.width);localStorage.setItem('dci_lens',scr.lens);}catch(e){}
+  try{localStorage.setItem('dci_scr',scr.type);localStorage.setItem('dci_scr_r',scr.custom);localStorage.setItem('dci_scr_w',scr.width);localStorage.setItem('dci_lens',scr.lens);localStorage.setItem('dci_dcp',scr.dcp);}catch(e){}
 }
 function currentRatio(){return parseRatio(document.getElementById('ratio').value);}
 
@@ -921,9 +922,15 @@ function currentRatio(){return parseRatio(document.getElementById('ratio').value
    (e.g. 2048×858 on a scope screen, 1998×1080 on a flat screen). Every format must then be scaled
    to fit inside that area. Returns native size, locked area, scaled size and the kept fraction. */
 function lockRegion(rk,S){var k=findKnownArea(S,rk);if(k)return{w:k.w,h:k.h};var b=RES[rk];return getFit(b.w,b.h,S);}
+/* DCP container the format is delivered in. Auto = the DCI container that holds it with the fewest bars
+   (1.85 and narrower up to 2.00 → Flat, 2.20 and wider → Scope). */
+function dcpFmt(R){
+  if(scr.dcp==='flat'||scr.dcp==='scope')return scr.dcp;
+  var f=getFit(1998,1080,R),c=getFit(2048,858,R);return f.w*f.h>=c.w*c.h?'flat':'scope';
+}
 function fixedLens(rk,R,S){
   /* the server/projector scales the whole DCP container (bars included) into the locked area */
-  var res=computeResult(rk,R,state.fmt),C=res.cont,A=res.fit,P=lockRegion(rk,S);
+  var res=computeResult(rk,R,dcpFmt(R)),C=res.cont,A=res.fit,P=lockRegion(rk,S);
   var k=Math.min(1,P.w/C.w,P.h/C.h);
   var cs={w:Math.round(C.w*k),h:Math.round(C.h*k)},as={w:Math.round(A.w*k),h:Math.round(A.h*k)};
   /* alternative: crop to the active picture first, then scale */
@@ -970,8 +977,10 @@ function buildScreen(){
 
   var fixed=scr.lens==='fixed';
   if(fixed){
-    var keys=resKeys(),F0=fixedLens(keys[0],R,S),lost=F0.lin<0.995,cn=FMT_NAME[state.fmt];
+    var keys=resKeys(),F0=fixedLens(keys[0],R,S),lost=F0.lin<0.995,cn=FMT_NAME[dcpFmt(R)];
     html+='<div class="scr-sub">Fixed lens · scaling</div>'+
+      '<div style="max-width:440px;margin-bottom:.75rem"><div class="field-label">DCP container <span class="hint">'+(scr.dcp==='auto'?'auto: '+cn:'forced')+'</span></div>'+
+      '<div class="seg">'+['auto','flat','scope'].map(function(v){return '<button data-dcp="'+v+'" aria-pressed="'+(scr.dcp===v)+'"><b>'+(v==='auto'?'Auto':FMT_NAME[v])+'</b><small>'+(v==='auto'?'by format':v==='flat'?'1998×1080':'2048×858')+'</small></button>';}).join('')+'</div></div>'+
       '<p class="pane-intro" style="margin-bottom:.75rem">Lens locked so the '+F0.P.w+'×'+F0.P.h+' area ('+RES[keys[0]].label+') fills the '+S.toFixed(2)+':1 screen. '+
       (lost?'The whole '+cn+' container ('+F0.C.w+'×'+F0.C.h+') is scaled to '+F0.cs.w+'×'+F0.cs.h+', so the '+R.toFixed(2)+':1 picture ('+F0.A.w+'×'+F0.A.h+') ends up as '+F0.as.w+'×'+F0.as.h+'.':
         'The '+cn+' container ('+F0.C.w+'×'+F0.C.h+') fits the locked area without scaling, so it plays natively.')+'</p>'+
@@ -993,18 +1002,19 @@ function buildScreen(){
   if(!rows.some(function(x){return Math.abs(x.v-R)<0.0001;}))rows.push({v:R,n:'Current',txt:R.toFixed(2)});
   rows.sort(function(a,b){return a.v-b.v;});
   var rk0=resKeys()[0];
-  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen'+(fixed?' · fixed lens · '+FMT_NAME[state.fmt]+' DCPs':'')+'</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th>'+(fixed?'<th>Res. kept</th>':'')+'<th class="hide-sm">Presentation</th></tr></thead><tbody>';
+  html+='<div class="scr-sub">All presets on this '+S.toFixed(2)+':1 screen'+(fixed?' · fixed lens · '+(scr.dcp==='auto'?'DCP by format':FMT_NAME[scr.dcp]+' DCPs'):'')+'</div><table class="rtable"><thead><tr><th>Format</th><th>'+(Wm?'Picture (m)':'Picture (% W × H)')+'</th><th>Screen used</th>'+(fixed?'<th>Res. kept</th>':'')+'<th class="hide-sm">Presentation</th></tr></thead><tbody>';
   rows.forEach(function(x){
     var g=pictureFit(S,x.v),u=g.fw*g.fh*100,cur=Math.abs(x.v-R)<0.0001;
     var dims=Wm?fmtM(Wm*g.fw)+' × '+fmtM(Hm*g.fh):Math.round(g.fw*100)+'% × '+Math.round(g.fh*100)+'%';
     var pres={match:'Fills screen',width:'Constant width',height:'Constant height',both:'Windowboxed'}[g.mode];
-    html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td>'+(fixed?(function(){var F=fixedLens(rk0,x.v,S);return '<td style="color:'+(F.lin<0.995?'var(--warn)':'var(--ok)')+'">'+pct(F.lin)+'</td>';}()):'')+'<td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
+    html+='<tr class="clk'+(cur?' cur':'')+'" data-v="'+x.txt+'"><td>'+x.txt+' <span style="font-family:var(--sans);font-weight:400;color:var(--muted)">'+x.n+'</span></td><td>'+dims+'</td><td><span class="fillbar"><i style="width:'+u.toFixed(0)+'%"></i></span>'+u.toFixed(0)+'%</td>'+(fixed?(function(){var F=fixedLens(rk0,x.v,S);return '<td style="color:'+(F.lin<0.995?'var(--warn)':'var(--ok)')+'">'+pct(F.lin)+' <span style="color:var(--muted);font-family:var(--sans);font-size:.78em">'+FMT_NAME[dcpFmt(x.v)]+'</span></td>';}()):'')+'<td class="hide-sm" style="font-family:var(--sans)">'+pres+'</td></tr>';
   });
   html+='</tbody></table>';
   out.innerHTML=html;
   drawScreenCanvas();
 }
 document.getElementById('scr-out').addEventListener('click',function(e){
+  var db=e.target.closest('[data-dcp]');if(db){scr.dcp=db.dataset.dcp;saveHash();buildScreen();return;}
   var tr=e.target.closest('tr[data-v]');if(!tr)return;
   document.getElementById('ratio').value=tr.dataset.v;runCalc();
 });
@@ -1293,6 +1303,7 @@ document.getElementById('dl-test-btn').addEventListener('click',function(){
   scr.custom=params.get('sr')||ls('dci_scr_r')||'';
   scr.width=params.get('sw')||ls('dci_scr_w')||'';
   scr.lens=(params.get('lens')||ls('dci_lens'))==='fixed'?'fixed':'motor';
+  var dc=params.get('dcp')||ls('dci_dcp');scr.dcp=(dc==='flat'||dc==='scope')?dc:'auto';
   runCalc();
 }());
 
